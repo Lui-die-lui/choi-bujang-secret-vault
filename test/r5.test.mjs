@@ -4,7 +4,7 @@ import { deploymentIdentity } from '../scripts/deployment-identity.mjs';
 import { runAttackChecks } from '../src/attack-check.mjs';
 
 const config = {
-  step: 2,
+  step: 3,
   judgeIssuer: 'https://aleph-judge-production.up.railway.app/defense/judge',
   sampleMarker: 'SAMPLE_NOTE_1',
   publicAppUrl: 'https://student-defense.vercel.app',
@@ -20,7 +20,7 @@ const env = {
 test('build identity uses Vercel Git and deployment metadata', () => {
   assert.deepEqual(deploymentIdentity(env, config), {
     schema: 'aleph.defense.deployment.v1',
-    step: 2,
+    step: 3,
     repoUrl: 'https://github.com/student-a/aleph-defense',
     commit: 'a'.repeat(40),
     publicAppUrl: 'https://student-defense-123.vercel.app',
@@ -31,7 +31,7 @@ test('build identity uses Vercel Git and deployment metadata', () => {
   assert.throws(() => deploymentIdentity({ ...env, VERCEL_GIT_COMMIT_SHA: 'short' }, config));
 });
 
-test('second-stage attack check reads data.json and the notes API without credentials', async () => {
+test('third-stage attack check confirms data.json stays empty and the notes APIs reject anonymous requests', async () => {
   const originalFetch = globalThis.fetch;
   const requestUrls = [];
   try {
@@ -39,31 +39,33 @@ test('second-stage attack check reads data.json and the notes API without creden
       requestUrls.push(String(url));
       assert.equal(init.redirect, 'error');
       if (String(url).endsWith('/data.json')) {
-        return new Response(JSON.stringify({ sampleMarker: 'SAMPLE_NOTE_1', notes: [] }), {
+        return new Response(JSON.stringify({ notes: [] }), {
           status: 200, headers: { 'content-type': 'application/json' },
         });
       }
-      return new Response(JSON.stringify({ notes: [{ title: '가상' }, { title: '가상' }] }), {
-        status: 200, headers: { 'content-type': 'application/json' },
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401, headers: { 'content-type': 'application/json' },
       });
     };
-    const [dataLeak, apiRead] = await runAttackChecks(config);
+    const [dataLeak, notesDenied, myNotesDenied] = await runAttackChecks(config);
     assert.deepEqual(requestUrls, [
       'https://student-defense.vercel.app/data.json',
       'https://student-defense.vercel.app/api/notes',
+      'https://student-defense.vercel.app/api/my-notes',
     ]);
     assert.match(dataLeak.observed, /보이지 않음/u);
-    assert.match(apiRead.observed, /notes 길이 2/u);
+    assert.match(notesDenied.observed, /거부됨/u);
+    assert.match(myNotesDenied.observed, /거부됨/u);
 
     globalThis.fetch = async (url) => (String(url).endsWith('/data.json')
-      ? new Response(JSON.stringify({ sampleMarker: 'SAMPLE_NOTE_1', notes: [{ title: '가상' }] }), {
+      ? new Response(JSON.stringify({ notes: [] }), {
         status: 200, headers: { 'content-type': 'application/json' },
       })
-      : new Response(JSON.stringify({ notes: [] }), {
+      : new Response(JSON.stringify({ notes: [{ title: '가상' }] }), {
         status: 200, headers: { 'content-type': 'application/json' },
       }));
-    const [leaked] = await runAttackChecks(config);
-    assert.match(leaked.observed, /메모가 보임/u);
+    const [, notesStillOpen] = await runAttackChecks(config);
+    assert.match(notesStillOpen.observed, /거부되지 않음/u);
   } finally {
     globalThis.fetch = originalFetch;
   }

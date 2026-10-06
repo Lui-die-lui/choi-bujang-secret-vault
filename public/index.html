@@ -28,6 +28,18 @@
     #session-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     #session-info p { margin: 0; }
     #session-info strong { display: inline; color: #8ad8df; }
+    .my-notes { margin: 26px 0; }
+    .my-notes h2 { font-size: 20px; margin: 0 0 14px; }
+    .my-notes label { display: block; margin-bottom: 10px; font-size: 14px; color: #bfd0e5; }
+    .my-notes input, .my-notes textarea { display: block; width: 100%; margin-top: 4px; padding: 10px 12px;
+      border-radius: 8px; border: 1px solid #51667c; background: #101a28; color: #ecf4ff; font-size: 15px;
+      font-family: inherit; box-sizing: border-box; }
+    .my-notes textarea { min-height: 70px; resize: vertical; }
+    .my-notes > form > button[type="submit"] { display: block; margin-left: auto; }
+    #my-notes-list li { display: grid; gap: 10px; }
+    #my-notes-list .note-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #my-notes-list .note-actions button { padding: 6px 14px; border-radius: 8px; border: 1px solid #51667c;
+      background: transparent; color: #ecf4ff; cursor: pointer; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -55,6 +67,21 @@
     </div>
 
     <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
+
+    <div class="my-notes" id="my-notes" hidden>
+      <h2>내 메모</h2>
+      <form id="create-note-form">
+        <label>제목
+          <input type="text" id="new-note-title" required>
+        </label>
+        <label>내용
+          <textarea id="new-note-body" required></textarea>
+        </label>
+        <button type="submit">메모 추가</button>
+        <p class="auth-error" id="create-note-error" role="alert"></p>
+      </form>
+      <ul id="my-notes-list" aria-live="polite"></ul>
+    </div>
   </main>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -101,18 +128,131 @@
       }
     }
 
+    const myNotesSection = document.querySelector('#my-notes');
+    const myNotesList = document.querySelector('#my-notes-list');
+    const createNoteForm = document.querySelector('#create-note-form');
+    const createNoteError = document.querySelector('#create-note-error');
+
     function renderSession(session) {
       loginError.textContent = '';
       if (session) {
         loginForm.hidden = true;
         sessionInfo.hidden = false;
         sessionEmail.textContent = session.user.email ?? '';
+        myNotesSection.hidden = false;
       } else {
         loginForm.hidden = false;
         sessionInfo.hidden = true;
         loginForm.reset();
+        myNotesSection.hidden = true;
       }
     }
+
+    function renderMyNote(note, session) {
+      const item = document.createElement('li');
+      const titleEl = document.createElement('strong');
+      const bodyEl = document.createElement('span');
+      titleEl.textContent = note.title;
+      bodyEl.textContent = note.body;
+
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.textContent = '수정';
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.textContent = '삭제';
+      const actions = document.createElement('div');
+      actions.className = 'note-actions';
+      actions.append(editButton, deleteButton);
+      item.append(titleEl, bodyEl, actions);
+
+      editButton.addEventListener('click', () => {
+        const titleInput = document.createElement('input');
+        titleInput.type = 'text';
+        titleInput.value = note.title;
+        const bodyInput = document.createElement('textarea');
+        bodyInput.value = note.body;
+        const saveButton = document.createElement('button');
+        saveButton.type = 'button';
+        saveButton.textContent = '저장';
+        const cancelButton = document.createElement('button');
+        cancelButton.type = 'button';
+        cancelButton.textContent = '취소';
+        const editActions = document.createElement('div');
+        editActions.className = 'note-actions';
+        editActions.append(saveButton, cancelButton);
+        item.replaceChildren(titleInput, bodyInput, editActions);
+
+        cancelButton.addEventListener('click', () => loadMyNotes(session));
+        saveButton.addEventListener('click', async () => {
+          const response = await fetch(`/api/my-notes/${note.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({ title: titleInput.value, body: bodyInput.value }),
+          });
+          if (!response.ok) {
+            alert('메모 수정에 실패했습니다.');
+            return;
+          }
+          await loadMyNotes(session);
+        });
+      });
+
+      deleteButton.addEventListener('click', async () => {
+        const response = await fetch(`/api/my-notes/${note.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!response.ok && response.status !== 404) {
+          alert('메모 삭제에 실패했습니다.');
+          return;
+        }
+        await loadMyNotes(session);
+      });
+
+      return item;
+    }
+
+    async function loadMyNotes(session) {
+      if (!session) {
+        myNotesList.replaceChildren();
+        return;
+      }
+      try {
+        const response = await fetch('/api/my-notes', {
+          cache: 'no-store',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!response.ok) throw new Error('내 메모를 읽을 수 없습니다.');
+        const data = await response.json();
+        if (!Array.isArray(data.notes)) throw new Error('자료 형식이 맞지 않습니다.');
+        myNotesList.replaceChildren(...data.notes.map(note => renderMyNote(note, session)));
+      } catch (error) {
+        const item = document.createElement('li');
+        item.textContent = error.message;
+        myNotesList.replaceChildren(item);
+      }
+    }
+
+    createNoteForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      createNoteError.textContent = '';
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const titleInput = document.querySelector('#new-note-title');
+      const bodyInput = document.querySelector('#new-note-body');
+      const response = await fetch('/api/my-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ title: titleInput.value, body: bodyInput.value }),
+      });
+      if (!response.ok) {
+        createNoteError.textContent = '메모를 추가하지 못했습니다.';
+        return;
+      }
+      createNoteForm.reset();
+      await loadMyNotes(session);
+    });
 
     function loginErrorMessage(error) {
       const message = error?.message ?? '';
@@ -139,10 +279,12 @@
     supabase.auth.onAuthStateChange((_event, session) => {
       renderSession(session);
       loadNotes(session);
+      loadMyNotes(session);
     });
     const { data: { session: initialSession } } = await supabase.auth.getSession();
     renderSession(initialSession);
     await loadNotes(initialSession);
+    await loadMyNotes(initialSession);
   </script>
 </body>
 </html>

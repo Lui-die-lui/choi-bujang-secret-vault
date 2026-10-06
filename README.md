@@ -2,13 +2,15 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 지금 작동하는 기능 (2단계 저장점)
+## 지금 작동하는 기능 (3단계 저장점)
 
-- 화면(`/`)은 Vercel 서버 함수 `/api/notes`를 호출해 가상 메모 네 건을 보여줍니다.
-- `/api/notes`(`api/notes.mjs`)는 서버 전용 환경변수 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`로 Supabase 테이블 `public.t02_vault_notes`를 읽습니다.
-- `data.json`, `public/data.json`에는 더 이상 메모가 없습니다(`"notes": []`).
-- **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel 프로젝트의 Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고 배포하면 `/`에서 네 건이 보입니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
-- **남은 약점**: `/api/notes`는 아직 로그인을 확인하지 않습니다(3단계 과제). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(자세한 내용은 아래 2단계 절 참고).
+- 화면(`/`)에서 Supabase Auth 이메일·비밀번호로 로그인/로그아웃할 수 있습니다(공식 SDK, 비밀번호·JWT 직접 생성 안 함).
+- 로그인해야만 `/api/notes`(2단계 공개 가상 메모 4건, `t02_vault_notes`)가 보입니다. 로그아웃하면 화면의 메모도 바로 지워집니다.
+- 로그인한 사용자는 "내 메모"에서 자신의 가상 메모를 추가·수정·삭제할 수 있습니다. API는 `GET/POST /api/my-notes`, `GET/PUT/DELETE /api/my-notes/:id`이며 `t03_personal_notes` 테이블(`owner_id uuid`)을 씁니다.
+- 모든 자료 API는 `src/verify-login.mjs`(미수정)로 `Authorization: Bearer <토큰>`을 검증합니다. 토큰이 없거나 검증 실패 시 메모 없이 401 JSON 오류를 돌려줍니다.
+- `data.json`, `public/data.json`에는 메모가 없습니다(`"notes": []`).
+- **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`과 `supabase/personal_notes.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
+- **남은 약점**: `GET/PUT/DELETE /api/my-notes/:id`는 로그인 여부만 확인하고 소유자(`owner_id`) 일치는 검사하지 않습니다 — 로그인한 다른 사용자가 메모 id를 알면 접근할 수 있습니다(4단계 과제). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
 ## 학생이 하는 일: 세 걸음
 
@@ -40,6 +42,20 @@ git show HEAD:public/data.json
 - **지금 배포 기준 확인(미확인)**: 저장점 커밋 이후 실제로 재배포한 주소에서 `/`(카드 4개 정상 표시), `/data.json`(메모 없음), `/api/notes`(네 건 정상 응답, 아직 비로그인도 허용)을 직접 열어 확인하는 절차는 아직 실행하지 않았습니다.
 
 **결론**: 지금 이 저장소의 작업본과 앞으로의 정적 배포에는 메모 문장이 없습니다. 그러나 과거 공개 커밋과 (존재한다면) 과거 배포 이력에 남은 노출은 이번 작업으로 해소되지 않았습니다.
+
+## 3단계: 진짜 로그인을 붙입니다
+
+**제작 1**: 화면에 Supabase Auth 이메일·비밀번호 로그인/로그아웃을 붙였습니다. 공식 SDK(`signInWithPassword`/`signOut`) 흐름만 쓰고 비밀번호나 JWT를 직접 만들지 않습니다.
+
+**제작 2**: `/api/notes`가 `src/verify-login.mjs`(수정하지 않음)로 `Authorization: Bearer <토큰>`을 검증합니다. 토큰이 없거나 검증에 실패하면 메모 없이 **401** `{"error":"unauthorized"}`를 돌려줍니다. 검증에 쓰는 발급자 정보는 `aleph.config.json`의 `identityProvider`(issuer/audience/jwksUrl, 비밀 키 제외)에 기록했습니다.
+
+**제작 3**: 로그인한 사용자가 자신의 가상 메모를 추가·수정·삭제하는 화면과 API를 붙였습니다.
+- DB: 기존 `public.t02_vault_notes`(bigint id, 2단계 공개 메모 4건)는 그대로 두고, 새 테이블 `public.t03_personal_notes`(`id uuid`, `owner_id uuid`, `title`, `content`, RLS 켜짐, `anon`/`authenticated` 권한 없음)를 추가했습니다. **실행할 SQL**: `supabase/personal_notes.local.sql`을 Supabase SQL Editor에서 그대로 실행하세요(로컬 전용 파일이라 Git에는 올라가지 않습니다). 기존 테이블·데이터는 건드리지 않습니다.
+- API: `GET/POST /api/my-notes`, `GET/PUT/DELETE /api/my-notes/:id`. 응답은 과제 규격 `{id,title,body}`를 따르고, DB 컬럼 `content`를 API의 `body`로 매핑합니다. POST에서 `id`를 생략하면 서버가 UUID를 만들어 `{id}`로 돌려줍니다. 삭제된 메모를 GET하면 404입니다.
+- 서버가 `verify-login.mjs`로 검증한 사용자 ID만 `owner_id`로 저장합니다(요청 본문의 `userId`·`role`은 쓰지 않음). 목록 GET(`/api/my-notes`)은 로그인한 사용자 본인의 메모만 돌려줍니다.
+- 실제 구현한 경로를 `aleph.config.json`의 `allowedRoutes`에 기록했습니다.
+
+**남은 허점(알면서 아직 안 고침)**: 메모 한 건 조회·수정·삭제(`GET/PUT/DELETE /api/my-notes/:id`)는 로그인 여부만 확인하고, 요청자가 그 메모의 실제 소유자(`owner_id`)인지는 검사하지 않습니다. 즉 로그인한 사용자 B가 사용자 A의 메모 UUID를 알아내면 A의 메모를 읽거나 고치거나 지울 수 있습니다. 이 소유자 검사는 4단계 과제로 남겨 둡니다.
 
 ## 시작 틀의 자동 처리
 
