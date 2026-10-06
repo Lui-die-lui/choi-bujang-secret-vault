@@ -1,8 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+import { createLoginVerifier } from '../src/verify-login.mjs';
 
 // 2단계: 가상 메모를 코드 밖(Supabase, t02_vault_notes)으로 옮기고
-// 서버 전용 환경변수로만 읽습니다. 이 주소는 아직 로그인 없이 누구나 호출할 수
-// 있다는 약점이 남아 있으며, 이는 README에 적어 둡니다(3단계 이후 과제).
+// 서버 전용 환경변수로만 읽습니다.
+// 3단계: 요청마다 src/verify-login.mjs로 Authorization 헤더의 Supabase 로그인
+// 토큰을 검증합니다. 브라우저가 보낸 userId·role은 쓰지 않습니다.
+const config = JSON.parse(readFileSync(resolve(import.meta.dirname, '..', 'aleph.config.json'), 'utf8'));
+let verifyLoginAuthorization;
+
 export default async function handler(request, response) {
   if (request.method !== 'GET') {
     response.setHeader('Allow', 'GET');
@@ -15,6 +22,20 @@ export default async function handler(request, response) {
   if (!supabaseUrl || !supabaseSecretKey) {
     console.error('notes API misconfigured: missing SUPABASE_URL or SUPABASE_SECRET_KEY');
     return response.status(500).json({ error: 'server_not_configured' });
+  }
+
+  if (!verifyLoginAuthorization) {
+    try {
+      verifyLoginAuthorization = createLoginVerifier({ config, supabaseSecretKey });
+    } catch (error) {
+      console.error('login verifier misconfigured:', error.message);
+      return response.status(500).json({ error: 'server_not_configured' });
+    }
+  }
+
+  const identity = await verifyLoginAuthorization(request.headers.authorization);
+  if (!identity) {
+    return response.status(401).json({ error: 'unauthorized' });
   }
 
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
