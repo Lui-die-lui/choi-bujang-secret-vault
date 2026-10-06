@@ -84,13 +84,26 @@
     </div>
   </main>
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    // 5단계: 로그인·세션 갱신·로그아웃을 서버 함수(/api/auth/*)가 대신 처리합니다.
+    // 화면 코드에는 Supabase 프로젝트 URL이나 공개 키가 전혀 없습니다.
+    const SESSION_STORAGE_KEY = 'bb-session';
+    let session = null; // { access_token, user: { email } } — 기존 함수들과 모양을 맞춤
+    let refreshToken = null;
+    let expiresAt = null; // unix seconds
+    let refreshTimer = null;
 
-    // Project URL과 publishable key는 공개용 값이라 화면 코드에 넣어도 됩니다(서버 전용 키 아님).
-    const supabase = createClient(
-      'https://iyxvvnrekxthoixcdlht.supabase.co',
-      'sb_publishable_T6veZAYIlx2HYpfPOTJ50g_yXVERRoW',
-    );
+    function persistSession(data) {
+      try { sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data)); } catch {}
+    }
+    function clearPersistedSession() {
+      try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch {}
+    }
+    function loadPersistedSession() {
+      try {
+        const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    }
 
     const loginForm = document.querySelector('#login-form');
     const loginError = document.querySelector('#login-error');
@@ -237,7 +250,6 @@
     createNoteForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       createNoteError.textContent = '';
-      const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const titleInput = document.querySelector('#new-note-title');
       const bodyInput = document.querySelector('#new-note-body');
@@ -263,28 +275,99 @@
       return '로그인에 실패했습니다. 다시 시도해 주세요.';
     }
 
+    function applySession(data) {
+      // data: { accessToken, refreshToken, expiresAt, email } | null
+      if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+      if (data) {
+        session = { access_token: data.accessToken, user: { email: data.email } };
+        refreshToken = data.refreshToken;
+        expiresAt = data.expiresAt;
+        persistSession(data);
+        scheduleRefresh();
+      } else {
+        session = null;
+        refreshToken = null;
+        expiresAt = null;
+        clearPersistedSession();
+      }
+      renderSession(session);
+      loadNotes(session);
+      loadMyNotes(session);
+    }
+
+    function scheduleRefresh() {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      if (!expiresAt) return;
+      const delay = Math.max(expiresAt * 1000 - Date.now() - 60000, 5000);
+      refreshTimer = setTimeout(doRefresh, delay);
+    }
+
+    async function doRefresh() {
+      if (!refreshToken) { applySession(null); return; }
+      try {
+        const response = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!response.ok) { applySession(null); return; }
+        applySession(await response.json());
+      } catch {
+        applySession(null);
+      }
+    }
+
+    async function restoreSession() {
+      const persisted = loadPersistedSession();
+      if (!persisted) return;
+      if (persisted.expiresAt && persisted.expiresAt * 1000 > Date.now() + 60000) {
+        applySession(persisted);
+        return;
+      }
+      refreshToken = persisted.refreshToken;
+      await doRefresh();
+    }
+
     loginForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       loginError.textContent = '';
       const email = document.querySelector('#login-email').value;
       const password = document.querySelector('#login-password').value;
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) loginError.textContent = loginErrorMessage(error);
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          loginError.textContent = loginErrorMessage({ message: data.error });
+          return;
+        }
+        applySession(data);
+      } catch {
+        loginError.textContent = loginErrorMessage({ message: 'network' });
+      }
     });
 
     logoutButton.addEventListener('click', async () => {
-      await supabase.auth.signOut();
+      if (session) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+        } catch {
+          // 네트워크 오류가 나도 화면은 로그아웃 상태로 전환합니다.
+        }
+      }
+      applySession(null);
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      renderSession(session);
-      loadNotes(session);
-      loadMyNotes(session);
-    });
-    const { data: { session: initialSession } } = await supabase.auth.getSession();
-    renderSession(initialSession);
-    await loadNotes(initialSession);
-    await loadMyNotes(initialSession);
+    renderSession(null);
+    await loadNotes(null);
+    await loadMyNotes(null);
+    await restoreSession();
   </script>
 </body>
 </html>

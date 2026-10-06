@@ -2,15 +2,15 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 지금 작동하는 기능 (4단계 저장점)
+## 지금 작동하는 기능 (5단계 저장점)
 
-- 화면(`/`)에서 Supabase Auth 이메일·비밀번호로 로그인/로그아웃할 수 있습니다(공식 SDK, 비밀번호·JWT 직접 생성 안 함).
+- 화면(`/`)에서 이메일·비밀번호로 로그인/로그아웃할 수 있습니다. 로그인·세션 갱신·로그아웃은 전부 서버 함수(`/api/auth/login`·`/api/auth/refresh`·`/api/auth/logout`)가 공식 Supabase SDK로 처리하며, **화면 코드에는 Supabase 프로젝트 URL이나 공개 키가 전혀 없습니다.**
 - 로그인해야만 `/api/notes`(2단계 공개 가상 메모 4건, `t02_vault_notes`, 소유자 없는 공용 자료)가 보입니다. 로그아웃하면 화면의 메모도 바로 지워집니다.
 - 로그인한 사용자는 "내 메모"에서 **자신의** 가상 메모만 추가·수정·삭제할 수 있습니다. API는 `GET/POST /api/my-notes`, `GET/PUT/DELETE /api/my-notes/:id`이며 `t03_personal_notes` 테이블(`owner_id uuid`)을 씁니다.
-- 개인 메모는 **API 쿼리 조건**(`id`+`owner_id`)과 **DB RLS 정책**(`auth.uid() = owner_id`) 두 단계로 모두 보호됩니다. 남의 메모 id로 조회·수정·삭제를 시도하면 **404**로 거부되고, anon 키로 Data API를 직접 불러도 권한이 없어 거부됩니다.
+- 개인 메모는 **API 쿼리 조건**(`id`+`owner_id`), **DB RLS 정책**(`auth.uid() = owner_id`), 그리고 **anon·authenticated 직접 테이블 권한 회수**(5단계) 세 겹으로 보호됩니다. 브라우저도 서버 함수만 거치고, Supabase Data API에 직접 접속하는 경로는 공개 키로도 로그인 토큰으로도 막혀 있습니다(`t02_vault_notes`는 2단계부터, `t03_personal_notes`는 4~5단계에 걸쳐).
 - 모든 자료 API는 `src/verify-login.mjs`(미수정)로 `Authorization: Bearer <토큰>`을 검증합니다. 토큰이 없거나 검증 실패 시 메모 없이 401 JSON 오류를 돌려줍니다.
 - `data.json`, `public/data.json`에는 메모가 없습니다(`"notes": []`).
-- **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
+- **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
 - **남은 약점**: `/api/notes`(공용 자료)는 로그인만 확인하고 소유자 개념이 없습니다(의도된 설계, 아래 4단계 절 참고). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
 ## 학생이 하는 일: 세 걸음
@@ -71,6 +71,16 @@ git show HEAD:public/data.json
 **개인 메모 보호 범위**: `t03_personal_notes`를 쓰는 `/api/my-notes`, `/api/my-notes/:id`(GET/POST/PUT/DELETE 전체)는 API 쿼리 조건과 DB의 RLS 정책, 두 단계에서 모두 본인 소유 행만 다루도록 제한됩니다. anon 키나 authenticated 키로 Supabase Data API를 직접 불러도 같은 제한이 적용됩니다(anon은 권한 자체가 없고, authenticated는 RLS로 본인 행만 보임).
 
 **공용 자료 예외 (확정 아님, 판단 근거만 기록)**: `/api/notes`(`t02_vault_notes`)는 이번 4단계에서 소유자 비교를 적용하지 않았습니다. 이 테이블은 모든 행의 `owner_id`가 처음부터 NULL인 공용 가상 자료이고, 여기에 `auth.uid()=owner_id` 식 검사를 적용하면 조건이 영원히 거짓이 되어 로그인한 누구도 읽을 수 없게 되는 기능 회귀가 생깁니다. 로그인 자체는 3단계부터 이미 요구하고 있어 "비로그인 접근 차단"은 충족된 상태입니다. **다만 이 처리가 과제 요구사항상 허용되는지는 확정된 것이 아니며, 심판 판정이나 다음 단계 지시로 바뀔 수 있는 설계 판단입니다.**
+
+## 5단계: 자료 요청을 서버 한곳으로 모읍니다
+
+**제작 1**: 브라우저 코드가 메모 자료를 Supabase에서 직접 읽거나 고치는 곳이 있는지 확인했습니다 — **없음**. `public/index.html`은 메모 CRUD를 전부 `/api/notes`, `/api/my-notes*` 서버 함수로만 호출하고 있었고, 로그인(Auth) 호출만 `supabase.auth.*`로 클라이언트에서 직접 이뤄지고 있었습니다. 그래서 파일은 바꾸지 않았습니다.
+
+**제작 2**: `t03_personal_notes`의 `PUBLIC`·`anon`·`authenticated` 직접 테이블 권한을 전부 회수하는 SQL을 제안했습니다(`supabase/t03_revoke_direct.local.sql`, 로컬 전용). 이제 이 테이블은 `service_role`(=우리 서버 함수)로만 접근 가능합니다. `service_role` 권한과 RLS 정책, 그리고 서버 함수의 로그인·소유자 검사 코드는 그대로 두었습니다. `aleph.config.json`의 `originalApiUrl`을 쿼리 없는 `t03_personal_notes` REST 주소(`https://iyxvvnrekxthoixcdlht.supabase.co/rest/v1/t03_personal_notes`)로 기록했습니다 — 심판이 anon 키로 직접 두드려볼 "원본 자료" 경로입니다. (`t02_vault_notes`는 2단계부터 이미 `anon`/`authenticated` 직접 권한이 없어 이번 SQL 대상에서 제외했습니다.)
+
+**추가 작업(공개 키 제거 보너스)**: 제작1·2와 별개로, 화면 코드에서 Supabase 공개 키(publishable/anon key)를 완전히 제거했습니다. 로그인·세션 갱신·로그아웃을 새 서버 함수 `api/auth/login.mjs`·`api/auth/refresh.mjs`·`api/auth/logout.mjs`로 옮기고(모두 공식 SDK의 `signInWithPassword`/`refreshSession`/`auth.admin.signOut`만 사용, JWT 직접 생성 없음), 화면은 이 서버 함수들을 `fetch`로 호출하도록 바꿨습니다. 세션은 브라우저의 `sessionStorage`에만 보관됩니다. 세 함수 모두 응답에 `Cache-Control: no-store`를 적용했고, 비밀번호·키·토큰 값은 로그에 남기지 않습니다(에러 로그에는 Supabase가 주는 일반 사유 문구만 기록). **참고**: 로그아웃은 해당 세션의 refresh token을 서버에서 즉시 폐기해 재발급을 막지만, 이미 발급된 access token(JWT, 기본 1시간 수명)은 서명 검증상 자연 만료 전까지 유효할 수 있습니다 — Supabase가 매 요청마다 로그아웃 여부를 실시간으로 대조하지는 않기 때문입니다.
+
+**이번 단계로 막은 길**: 로그인한 사람의 진짜 토큰이나 공개 anon 키로 Supabase Data API(`/rest/v1/...`)를 직접 불러 자료에 접근하던 경로가 `t02_vault_notes`·`t03_personal_notes` 모두에서 막혔습니다. 브라우저도 이제 Auth 호출을 제외하면 우리 서버 함수만 거칩니다.
 
 ## 시작 틀의 자동 처리
 

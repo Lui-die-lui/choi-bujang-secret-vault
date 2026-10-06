@@ -1,12 +1,15 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 
-// public.t03_personal_notes의 RLS를 anon 키로 직접 확인하는 용도입니다.
-// publishable/anon 키는 공개용이라(public/index.html에도 같은 값이 있음) 비밀값이 아닙니다.
+// public.t03_personal_notes의 RLS/권한을 anon 키로 직접 확인하는 용도입니다.
+// publishable/anon 키는 공개용이라(과거 public/index.html에도 같은 값이 있었음) 비밀값이 아닙니다.
 const SUPABASE_ANON_KEY = 'sb_publishable_T6veZAYIlx2HYpfPOTJ50g_yXVERRoW';
 
+// 공개 정적 파일·브라우저 묶음에 섞여 있으면 안 되는 서버 전용 키 패턴입니다.
+const SECRET_KEY_PATTERN = /sb_secret_[A-Za-z0-9_-]{12,}/u;
+
 export async function runAttackChecks(config) {
-  if (config.step !== 4) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 5) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -50,18 +53,36 @@ export async function runAttackChecks(config) {
   const notesCheck = await checkAnonymousRejected('/api/notes');
   const myNotesCheck = await checkAnonymousRejected('/api/my-notes');
 
-  // 우리 서버 API를 거치지 않고, Supabase Data API를 anon 키로 직접 호출해도
-  // t03_personal_notes에 접근할 수 없어야 합니다(REVOKE + RLS). 심판이 재현할
-  // 수 없는 authenticated 역할의 직접 접근은 이 점검 대상이 아닙니다.
-  let directDbCheck = { status: null, rejected: false };
-  if (typeof config.identityProvider?.issuer === 'string') {
-    const supabaseOrigin = new URL(config.identityProvider.issuer).origin;
-    const response = await fetch(`${supabaseOrigin}/rest/v1/t03_personal_notes?select=id`, {
+  // 5단계: 원본 Supabase 자료 API(aleph.config.json의 originalApiUrl)를
+  // 우리 서버를 거치지 않고 anon 키로 직접 조회·수정해도 거부되어야 합니다.
+  // 심판도 anon 키로만 확인하며, 재현할 수 없는 authenticated 역할의 직접
+  // 접근은 이 점검 대상이 아닙니다.
+  let readCheck = { status: null, rejected: false };
+  let writeCheck = { status: null, rejected: false };
+  if (typeof config.originalApiUrl === 'string' && config.originalApiUrl.startsWith('https://')) {
+    const readResponse = await fetch(`${config.originalApiUrl}?select=id`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
       signal: AbortSignal.timeout(10000),
     });
-    directDbCheck = { status: response.status, rejected: response.status === 401 || response.status === 403 };
+    readCheck = { status: readResponse.status, rejected: readResponse.status === 401 || readResponse.status === 403 };
+
+    const writeResponse = await fetch(config.originalApiUrl, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title: 'attack-check', content: 'attack-check' }),
+      signal: AbortSignal.timeout(10000),
+    });
+    writeCheck = { status: writeResponse.status, rejected: writeResponse.status === 401 || writeResponse.status === 403 };
   }
+
+  // 5단계: 공개 정적 파일(첫 화면)에 서버 전용 키가 섞여 있으면 안 됩니다.
+  const homeResponse = await fetch(app, { redirect: 'error', signal: AbortSignal.timeout(10000) });
+  const homeText = await homeResponse.text();
+  const secretKeyFound = SECRET_KEY_PATTERN.test(homeText);
 
   return [
     {
@@ -86,11 +107,25 @@ export async function runAttackChecks(config) {
         : `비로그인 요청이 거부되지 않음 (HTTP ${myNotesCheck.status}, JSON 응답 ${myNotesCheck.isJson})`,
     },
     {
-      attackId: 'anonymous_direct_data_api_denied',
-      expected: 'anon 키로 t03_personal_notes를 직접 조회하면 401 또는 403으로 거부되어야 함',
-      observed: directDbCheck.rejected
-        ? `anon 키 직접 조회가 거부됨 (HTTP ${directDbCheck.status})`
-        : `anon 키 직접 조회가 거부되지 않음 (HTTP ${directDbCheck.status})`,
+      attackId: 'anon_direct_original_api_read_denied',
+      expected: 'anon 키로 원본 Supabase 자료 API(originalApiUrl)를 직접 조회하면 거부되어야 함',
+      observed: readCheck.rejected
+        ? `anon 키 직접 조회가 거부됨 (HTTP ${readCheck.status})`
+        : `anon 키 직접 조회가 거부되지 않음 (HTTP ${readCheck.status})`,
+    },
+    {
+      attackId: 'anon_direct_original_api_write_denied',
+      expected: 'anon 키로 원본 Supabase 자료 API(originalApiUrl)를 직접 수정(추가)하면 거부되어야 함',
+      observed: writeCheck.rejected
+        ? `anon 키 직접 추가가 거부됨 (HTTP ${writeCheck.status})`
+        : `anon 키 직접 추가가 거부되지 않음 (HTTP ${writeCheck.status})`,
+    },
+    {
+      attackId: 'static_bundle_no_secret_key',
+      expected: '첫 화면 응답에 서버 전용 키(sb_secret_...) 문자열이 없어야 함',
+      observed: secretKeyFound
+        ? '첫 화면 응답에서 서버 전용 키 패턴이 발견됨'
+        : '첫 화면 응답에서 서버 전용 키 패턴이 발견되지 않음',
     },
   ];
 }
