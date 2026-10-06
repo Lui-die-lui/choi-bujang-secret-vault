@@ -8,10 +8,11 @@ function serialize(row) {
   return { id: row.id, title: row.title, body: row.content };
 }
 
-// 3단계: 메모 한 건 조회·수정·삭제. 로그인 여부만 확인하고, 요청자가
-// 이 메모의 소유자(owner_id)인지는 아직 확인하지 않습니다 — 그래서 로그인한
-// 다른 사용자가 id를 알면 이 메모에 접근할 수 있습니다. 이 허점은 4단계에서
-// 고칩니다(README 참고).
+// 3단계: 메모 한 건 조회·수정·삭제.
+// 4단계: id 조건과 함께 owner_id = 서버가 검증한 사용자 ID 조건을 쿼리에
+// 같이 넣습니다. 남의 메모는 쿼리 결과가 아예 없으므로 "없는 메모"와 구분
+// 없이 404로 거부합니다(존재 여부를 알려주지 않음). 요청 본문의 owner_id는
+// 애초에 읽지 않으므로 소유자 변경 자체가 불가능합니다.
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
@@ -29,13 +30,19 @@ export default async function handler(request, response) {
 
   const auth = await verifyRequestLogin(request, supabaseSecretKey);
   if (!auth.ok) return response.status(auth.status).json(auth.body);
+  const { identity } = auth;
 
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
 
   if (request.method === 'GET') {
-    const { data, error } = await supabase.from(TABLE).select('id, title, content').eq('id', id).maybeSingle();
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('id, title, content')
+      .eq('id', id)
+      .eq('owner_id', identity.userId)
+      .maybeSingle();
     if (error) {
       console.error('my-notes read failed:', error.message);
       return response.status(500).json({ error: 'notes_read_failed' });
@@ -54,6 +61,7 @@ export default async function handler(request, response) {
       .from(TABLE)
       .update({ title, content })
       .eq('id', id)
+      .eq('owner_id', identity.userId)
       .select('id, title, content')
       .maybeSingle();
     if (error) {
@@ -65,7 +73,13 @@ export default async function handler(request, response) {
   }
 
   if (request.method === 'DELETE') {
-    const { data, error } = await supabase.from(TABLE).delete().eq('id', id).select('id').maybeSingle();
+    const { data, error } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq('id', id)
+      .eq('owner_id', identity.userId)
+      .select('id')
+      .maybeSingle();
     if (error) {
       console.error('my-notes delete failed:', error.message);
       return response.status(500).json({ error: 'notes_write_failed' });
