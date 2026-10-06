@@ -13,6 +13,7 @@ const config = {
     audience: 'authenticated',
     jwksUrl: 'https://test-project.supabase.co/auth/v1/.well-known/jwks.json',
   },
+  allowedRoutes: ['GET /api/notes', 'POST /api/auth/login'],
   originalApiUrl: 'https://test-project.supabase.co/rest/v1/t03_personal_notes',
 };
 const env = {
@@ -32,6 +33,8 @@ test('build identity uses Vercel Git and deployment metadata', () => {
     publicAppUrl: 'https://student-defense-123.vercel.app',
     judgeIssuer: config.judgeIssuer,
     sampleMarker: config.sampleMarker,
+    allowedRoutes: config.allowedRoutes,
+    originalApiUrl: config.originalApiUrl,
   });
   assert.throws(() => deploymentIdentity({ ...env, VERCEL_GIT_PROVIDER: undefined }, config));
   assert.throws(() => deploymentIdentity({ ...env, VERCEL_GIT_COMMIT_SHA: 'short' }, config));
