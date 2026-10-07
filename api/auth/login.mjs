@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { createSupabaseBlocklistStore, extractSourceIp, isSourceBlocked } from '../../src/xdr-login-guard.mjs';
+import { createSupabaseBlocklistStore, extractSourceIp, isSourceBlocked, recordFailureAndMaybeBlock } from '../../src/xdr-login-guard.mjs';
 
 // 5단계: 로그인을 서버 함수가 대신 처리해, 화면 코드에는 Supabase 공개 키가
 // 전혀 없습니다. 공식 SDK의 signInWithPassword만 쓰고 JWT를 직접 만들지
@@ -40,6 +40,7 @@ export default async function handler(request, response) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.session) {
     console.error('auth/login failed:', error?.message);
+    await recordFailureAndMaybeBlock({ supabaseUrl, supabaseSecretKey, sourceIp, account: email });
     return response.status(401).json({ error: error?.message ?? 'login_failed' });
   }
 

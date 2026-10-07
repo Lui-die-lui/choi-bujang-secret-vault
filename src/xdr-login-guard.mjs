@@ -10,6 +10,15 @@
 // createMemoryBlocklistStore(격리된 메모리 표)를 씁니다 — api/auth/login.mjs가
 // 실제로 호출하는 것과 똑같은 isSourceBlocked/extractSourceIp를 시험에서도
 // 그대로 호출하므로, 저장소만 바뀌고 판정 코드 경로는 같습니다.
+//
+// recordFailureAndMaybeBlock은 실제 로그인 실패를 xdr_brute_force_failures
+// 표(supabase/xdr_login_failures.local.sql, 학생이 직접 실행)에 남기고, 같은
+// 출발 주소·계정의 실패가 xdr/brute-force/patterns.json의 failureThreshold를
+// 넘으면 xdr_brute_force_blocklist에 차단 규칙을 올립니다 — xdr/brute-force/
+// decide.mjs가 오프라인 시험 fixture로 하는 것과 같은 기준을, 실제 로그인 요청에
+// 대해서도 적용하는 길입니다. 이 함수가 실패해도(표 없음 등) 로그인 자체는 그대로
+// 진행됩니다(fail-open, 콘솔 오류만 남김) — 탐지 부가 기능이 로그인을 막으면 안 되기
+// 때문입니다.
 
 // 순수 로직이라 DB 없이도 시험할 수 있습니다.
 export function isRowActive(row, nowMs) {
@@ -60,6 +69,59 @@ export async function isSourceBlocked({ store, sourceIp, nowMs = Date.now() }) {
   } catch (error) {
     console.error('xdr login guard lookup failed (fail-open):', error.message);
     return false;
+  }
+}
+
+async function loadFailureThresholdConfig() {
+  const { readFileSync } = await import('node:fs');
+  const { dirname, resolve } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const patternsPath = resolve(moduleDir, '..', 'xdr', 'brute-force', 'patterns.json');
+  const { config } = JSON.parse(readFileSync(patternsPath, 'utf8'));
+  return config;
+}
+
+// 로그인 실패 하나를 기록하고, 같은 출발 주소·계정의 실패가 문턱을 넘으면
+// xdr_brute_force_blocklist에 차단 규칙을 올립니다. sourceIp가 없으면(헤더를
+// 못 읽은 경우) 아무 것도 하지 않습니다 — 누구를 차단할지 알 수 없기 때문입니다.
+export async function recordFailureAndMaybeBlock({ supabaseUrl, supabaseSecretKey, sourceIp, account, nowMs = Date.now() }) {
+  if (!supabaseUrl || !supabaseSecretKey || !sourceIp || !account) return;
+  try {
+    const config = await loadFailureThresholdConfig();
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(supabaseUrl, supabaseSecretKey, {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+    });
+
+    const { error: insertError } = await supabase
+      .from('xdr_brute_force_failures')
+      .insert({ source_ip: sourceIp, account });
+    if (insertError) throw new Error(insertError.message);
+
+    const windowStart = new Date(nowMs - config.windowSeconds * 1000).toISOString();
+    const { count, error: countError } = await supabase
+      .from('xdr_brute_force_failures')
+      .select('id', { count: 'exact', head: true })
+      .eq('source_ip', sourceIp)
+      .eq('account', account)
+      .gte('created_at', windowStart);
+    if (countError) throw new Error(countError.message);
+
+    if ((count ?? 0) >= config.failureThreshold) {
+      const expiresAt = new Date(nowMs + config.blockDurationSeconds * 1000).toISOString();
+      const { error: upsertError } = await supabase
+        .from('xdr_brute_force_blocklist')
+        .upsert({
+          source_ip: sourceIp,
+          expires_at: expiresAt,
+          basis_alert_ids: ['LIVE-CAPTURE'],
+          reason: `실시간 로그인 실패 ${count}회 (repeated_failed_logins_same_source_account)`,
+        });
+      if (upsertError) throw new Error(upsertError.message);
+    }
+  } catch (error) {
+    console.error('xdr failure capture failed (fail-open, login unaffected):', error.message);
   }
 }
 

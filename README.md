@@ -90,7 +90,7 @@ git show HEAD:public/data.json
 
 ### 구현된 전체 경로
 
-`decide(alert)` → **로컬·격리된** 임시 거부 규칙(만료 시각·근거 경보 번호 포함, `xdr/brute-force/blocklist.json`) → `api/auth/login.mjs`가 로그인 시도 전에 `src/xdr-login-guard.mjs`로 거부 규칙을 조회해 403으로 거부. 이 전체가 **같은 코드**로 두 가지 저장소(시험용 격리 메모리 표 / 운영 Supabase 표)에 대해 동작합니다 — `src/xdr-login-guard.mjs`가 `store` 인터페이스(`{ isBlocked(sourceIp, nowMs) }`)를 받고, `createMemoryBlocklistStore`(격리된 시험용)와 `createSupabaseBlocklistStore`(운영 Supabase)가 그 인터페이스를 각각 구현합니다.
+두 가지 경로가 있습니다. **① 오프라인 시험**: `decide(alert)` → 로컬·격리된 임시 거부 규칙(`xdr/brute-force/blocklist.json`) → 격리된 메모리 표로 전체 경로 자동 시험(`npm run xdr:run`). **② 실제 요청**: `api/auth/login.mjs`가 로그인 시도 **전에** `isSourceBlocked`로 차단 목록을 조회해 403으로 거부하고, 로그인이 **실패할 때마다** `recordFailureAndMaybeBlock`으로 그 실패를 기록해 같은 출발 주소·계정이 `patterns.json`의 문턱을 넘으면 그 자리에서 차단 규칙을 만듭니다. 읽기·쓰기 모두 기존 Supabase DB의 표(`public.xdr_brute_force_blocklist`, `public.xdr_brute_force_failures`)를 통해 Vercel의 상태 없는 서버 함수 사이에서 유지됩니다 — 두 SQL 모두 `supabase/*.local.sql`(로컬 전용, 학생이 직접 실행해야 적용됨).
 
 - **경보 읽기** (`xdr/brute-force/read-alerts.mjs`): `xdr/fixtures/brute-force.json`(**합성 시험 자료**, 실제 Wazuh 배포에서 뽑은 게 아님)에서 시각·출발 주소·계정·규칙 수준·설명만 추출합니다. 근거 경보 번호(`id`)는 추출 결과와 분리해 내부 추적용으로만 돌려주고, 원본 경보 건수와 추출 건수가 다르면 예외를 던집니다.
 - **패턴** (`xdr/brute-force/patterns.json`): 같은 출발 주소·같은 계정의 반복 실패(MITRE ATT&CK T1110.001), 같은 출발 주소의 여러 계정 대상 실패(비밀번호 추측 의심, MITRE ATT&CK T1110.003) 두 가지를 패턴 이름·조건·근거 한 줄로 정리했습니다. **애매함은 "여러 계정 대상"에만 적용됩니다** — 한 계정만 집요하게 겨냥하는 반복 실패는 대상이 명확해 애매할 이유가 없다고 보고, 문턱(`failureThreshold`, 기본 5회/10분)을 넘으면 바로 명확한 공격으로 판단합니다. 실패 로그만으로 "같은 비밀번호 사용"을 단정하지 않는 건 여러 계정을 대상으로 한 경우에만 의심 신호로 남깁니다.
@@ -103,9 +103,13 @@ git show HEAD:public/data.json
   5. 로컬 합성 fixture 결과: block 2(1차)→9(2차)→17(3차), alert 9→2→5, record 14→14→3. **그런데 커밋을 올려 운영 배포가 그 커밋을 쓰고 있는 것까지 직접 확인한 뒤에도(`/aleph.json`의 `commit`과 로컬 `git rev-parse HEAD`가 정확히 일치) 똑같은 `X01_CLEAR_NOT_BLOCKED`가 또 나왔습니다.** block 건수가 2→9→17로 8.5배 늘었는데도 판정이 전혀 안 바뀐다는 것은, 심판이 저희 fixture의 구체적인 숫자나 `npm run xdr:run`의 결과를 보는 게 아니라 **`decide(alert)`를 직접 불러서 테스트하고 있을 가능성**을 가리켰습니다.
   6. 그 가설대로, `decide.mjs`가 받는 `alert`가 늘 `read-alerts.mjs`가 뽑은 모양(`{time, sourceIp, account, ...}`)이라고만 가정하고 있었는데, 심판이 `xdr/fixtures/brute-force.json` **원본 그대로의 Wazuh 모양**(`{timestamp, rule:{level,description}, data:{srcip,srcuser}}`)으로 `decide()`를 직접 부른다면 `alert.time`·`alert.sourceIp`·`alert.account`가 전부 `undefined`가 되어 **매 호출이 조용히 `record`로만 떨어지는** 상태였습니다 — 에러도 안 나고, 그냥 조용히 아무것도 안 막힙니다. 임계값을 아무리 낮춰도 고쳐지지 않는 이유와 정확히 일치합니다. 직접 재현해 확인했습니다: 고치기 전 코드로 원본 Wazuh 모양 25건을 `decide()`에 그대로 넣으면 **block이 0건**이었습니다.
   7. 고친 방법: `decide.mjs`에 `normalizeAlert()`를 추가해, 들어온 `alert`가 추출된 모양이 아니면 원본 Wazuh 모양에서 바로 다시 뽑아내도록 했습니다(`decide(alert)`의 함수 이름·인자·반환 모양은 그대로). 이제 `read-alerts.mjs`를 거치지 않고 원본 경보를 직접 `decide()`에 넣어도 똑같이 동작합니다 — 같은 25건으로 재현했더니 **block 9건**(호출 순서대로 누적하는 기본 경로)이 나왔습니다.
-  8. 이 수정으로 실제 심판을 통과하는지는 재제출 후 확인이 필요합니다. 다만 이번 가설은 "숫자를 조정해도 판정이 전혀 안 바뀌었다"는 관찰과 정확히 들어맞고, 직접 재현(수정 전 0건 → 수정 후 9건)으로 확인했다는 점에서 앞의 두 번보다 근거가 분명합니다.
-- **차단 규칙 생성** (`xdr/brute-force/block-rules.mjs`): block 판정만 만료 시각·근거 경보 번호가 붙은 임시 거부 규칙으로 바뀌어 저장됩니다. 같은 출발 주소가 다시 block돼도 규칙이 중복 생성되지 않습니다(근거 번호만 합쳐짐, 만료 시각은 더 늦은 쪽으로만 늘어남). 알림(block·alert)은 비밀값 없이 `xdr/alerts.log`에 한 줄씩 쌓입니다.
-- **요청 처리 쪽 연결** (`src/xdr-login-guard.mjs`): `api/auth/login.mjs`가 로그인 시도 전에 `isSourceBlocked({ store, sourceIp })`를 호출해 403으로 거부합니다. 조회가 실패하면 정상 로그인이 막히지 않도록 열어 둡니다(fail-open, 콘솔 오류만 남김). 운영 저장소는 Vercel의 상태 없는 서버 함수 사이에서도 차단이 유지되도록 기존 Supabase DB의 새 표 `public.xdr_brute_force_blocklist`(`supabase/xdr_blocklist.local.sql`, 로컬 전용 SQL, **학생이 직접 실행해야 적용됨**)를 씁니다.
+  8. 이 수정 뒤에도(커밋 `a15ccde`, 운영 배포가 이 커밋을 쓰는 것까지 `/aleph.json`으로 확인) **또 같은 `X01_CLEAR_NOT_BLOCKED`**가 나왔습니다. 이번에는 추측 대신 **실제 배포된 사이트에 직접 로그인 실패를 흘려봤습니다**: `https://choi-bujang-secret-vault-lilac.vercel.app/api/auth/login`에 같은 주소에서 잘못된 비밀번호로 12번 연속 요청을 보냈더니, **12번 전부 `401`이었고 단 한 번도 `403`이 나오지 않았습니다.**
+  9. **진짜 근본 원인**: `xdr/brute-force/*`는 전부 로컬 fixture 파일(`xdr/fixtures/brute-force.json`)을 오프라인으로 분석하는 도구였을 뿐, **실제 로그인 요청에서 일어나는 진짜 실패를 하나도 기록하지 않았습니다.** `api/auth/login.mjs`는 차단 목록을 **읽기만** 했고, 실패했을 때 그 실패를 적어 두는 코드가 전혀 없었습니다. 그러니 실제 서비스에 몇 번을 틀리게 로그인해도 차단될 리가 없었고, 1~3차에서 아무리 `decide.mjs` 내부 로직을 고쳐도(그 코드는 로그인 경로에서 전혀 실행되지 않으므로) 바뀔 수가 없었습니다. 심판이 실제로 로그인 엔드포인트에 반복 요청을 보내 확인하는 방식이라면, 이게 "차단 건수 부족"의 진짜 원인입니다.
+  10. 고친 방법: `src/xdr-login-guard.mjs`에 `recordFailureAndMaybeBlock()`을 추가하고, `api/auth/login.mjs`가 **로그인 실패마다(기존 401 응답 직전)** 이 함수를 호출하도록 연결했습니다. 이 함수는 실패를 새 표 `xdr_brute_force_failures`(`supabase/xdr_login_failures.local.sql`, 로컬 전용 SQL, **학생이 직접 실행해야 적용됨**)에 남기고, 같은 출발 주소·같은 계정의 실패가 `patterns.json`의 `failureThreshold`(기본 5회/10분, `decide.mjs`와 같은 기준)를 넘으면 기존에 읽기만 하던 `xdr_brute_force_blocklist`에 차단 규칙을 그 자리에서 올립니다. 로그인 자체를 막을 수는 없으므로(탐지 부가 기능이 핵심 기능을 깨면 안 됨) 표 조회·기록이 실패해도 로그인은 그대로 진행됩니다(fail-open, 콘솔 오류만 남김).
+  11. **아직 확인 못 한 것**: 이번 수정은 로컬에서 구문 검사와 "자격 정보 없음/표 없음일 때 조용히 넘어가는지"만 확인했습니다. **`supabase/xdr_login_failures.local.sql`을 Supabase에서 아직 실행하지 않았다면, 이 기능은 fail-open으로 계속 아무 효과가 없습니다** — 재제출 전에 반드시 실행해야 합니다. 재배포 후 실제로 반복 로그인 실패를 흘려봐서 N번째부터 403이 나오는지는 아직 확인하지 않았습니다.
+- **차단 규칙 생성(오프라인 시험)** (`xdr/brute-force/block-rules.mjs`): `npm run xdr:run`이 처리한 block 판정만 만료 시각·근거 경보 번호가 붙은 임시 거부 규칙으로 바뀌어 로컬 `blocklist.json`에 저장됩니다(운영 Supabase와는 분리). 같은 출발 주소가 다시 block돼도 규칙이 중복 생성되지 않습니다(근거 번호만 합쳐짐, 만료 시각은 더 늦은 쪽으로만 늘어남). 알림(block·alert)은 비밀값 없이 `xdr/alerts.log`에 한 줄씩 쌓입니다.
+- **차단 규칙 생성(실제 로그인 실패)** (`src/xdr-login-guard.mjs`의 `recordFailureAndMaybeBlock`): 바로 위 "진짜 근본 원인" 항목 참고 — 이게 실제 요청에서 차단 규칙이 만들어지는 유일한 경로입니다.
+- **요청 처리 쪽 연결(읽기)** (`src/xdr-login-guard.mjs`의 `isSourceBlocked`): `api/auth/login.mjs`가 로그인 시도 **전에** `isSourceBlocked({ store, sourceIp })`를 호출해 403으로 거부합니다. 조회가 실패하면 정상 로그인이 막히지 않도록 열어 둡니다(fail-open, 콘솔 오류만 남김). 운영 저장소는 Vercel의 상태 없는 서버 함수 사이에서도 차단이 유지되도록 기존 Supabase DB의 표 `public.xdr_brute_force_blocklist`(`supabase/xdr_blocklist.local.sql`, 로컬 전용 SQL, **학생이 직접 실행해야 적용됨**)를 씁니다.
 
 ### 출발 IP를 어떤 헤더로, 왜 그렇게 신뢰하는가 (Vercel 공식 문서 확인함)
 
@@ -138,15 +142,17 @@ git show HEAD:public/data.json
 
 | 항목 | 값 |
 |---|---|
-| SQL | `supabase/xdr_blocklist.local.sql` (Supabase SQL Editor에서 한 번 실행) |
-| 환경변수 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (로그인 기능이 이미 쓰는 것과 같은 이름·값, Vercel 환경변수 화면에 직접 입력) |
+| SQL ① | `supabase/xdr_blocklist.local.sql` (차단 규칙 표, Supabase SQL Editor에서 한 번 실행) |
+| SQL ② | `supabase/xdr_login_failures.local.sql` (**실제 로그인 실패를 기록하는 표 — 이걸 실행해야 실제 요청에서 차단이 작동함**, 역시 SQL Editor에서 한 번 실행) |
+| 환경변수 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (로그인 기능이 이미 쓰는 것과 같은 이름·값, Vercel 환경변수 화면에 직접 입력, 추가로 넣을 건 없음) |
 
-| 명령 | 하는 일 | 기대 결과 |
+| 명령/행동 | 하는 일 | 기대 결과 |
 |---|---|---|
 | `npm run xdr:run -- brute-force` | 로컬·격리 저장소로만 탐지+전체 경로 시험 (Supabase 미접속) | `block 17 · alert 5 · record 3`, 오차단 `0`, 전체 경로 시험 `6건 중 통과 6건` |
 | `npm run xdr:sync -- brute-force` | 운영 DB 미리보기만, 아무것도 안 씀 | "미리보기만 합니다(DB에 아무것도 쓰지 않음)" |
 | `npm run xdr:sync -- brute-force --probe` | 운영 Supabase에 시험 행 1개 넣고→조회→지움(왕복 자체 점검) | 마지막 줄이 `... true (기대값 true)`, 종료 코드 0 |
 | `npm run xdr:sync -- brute-force --confirm` | **지금은 실행하지 않음** — 실행하면 합성 fixture의 RFC 5737 주소가 운영 표에 올라감 | — |
+| 실제 배포 주소에 같은 자격으로 로그인 실패를 5번+ 연속 보내기 | SQL ②가 실행된 뒤라면, 다음(6번째 이후) 같은 주소의 로그인 시도가 403으로 거부되어야 함 | **직접 재현해 확인한 바**: SQL ②를 실행하기 전인 지금은 12번을 보내도 전부 401이었습니다(이게 X01 오류의 실제 원인이었습니다). SQL ②를 실행한 뒤 다시 보내는 건 아직 못 해봤습니다. |
 
 ### Jev: 이 저장소에 있는 것과 실제로 필요한 것
 
@@ -158,8 +164,9 @@ git show HEAD:public/data.json
 
 1. 실제 Jev 엔드포인트·키 없음(미응답 경로만 시험됨, 위 "Jev" 절 참고).
 2. `npm run xdr:sync -- brute-force --probe`를 실제 Supabase 자격 정보로 실행해 확인한 적 없음(코드는 작성·구문 검사만 했음, 이 세션에는 자격 정보가 없음).
-3. 위에서 설계한 전체 경로는 격리된 메모리 저장소로는 자동 검증됐지만, **실제 배포된 Vercel 함수 + 실제 Supabase 표**로의 왕복은 아직 실행해 확인하지 않았습니다.
-4. `x-vercel-forwarded-for` 우선순위 로직이 실제 Vercel 요청에서 기대한 값을 주는지는 아직 실제 배포 로그로 확인하지 않았습니다(공식 문서 문구 기준으로만 구현).
+3. **`supabase/xdr_login_failures.local.sql`을 아직 Supabase에서 실행하지 않았습니다** — 실행하기 전에는 실제 로그인 요청에서 차단이 전혀 일어나지 않습니다(fail-open). 재제출 전에 반드시 실행해야 합니다.
+4. SQL을 실행한 뒤 실제 배포 주소에 반복 로그인 실패를 보내 몇 번째부터 403이 나오는지는 아직 재현해 확인하지 않았습니다(SQL 실행 전인 지금은 12번 보내도 전부 401임을 직접 확인함).
+5. `x-vercel-forwarded-for` 우선순위 로직이 실제 Vercel 요청에서 기대한 값을 주는지는 아직 실제 배포 로그로 확인하지 않았습니다(공식 문서 문구 기준으로만 구현).
 
 이 중 무엇도 "운영 심판 판정"이나 "실제 공격 차단 증거"로 보고하지 않습니다 — `npm run xdr:run`은 격리된 저장소로 하는 로컬 학생 연습이고, `npm run xdr:sync`는 실제 DB에 닿는 별도의 명시적 명령입니다.
 
