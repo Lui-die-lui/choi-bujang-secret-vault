@@ -1,0 +1,26 @@
+{
+  "schema": "xdr.brute-force.result.v1",
+  "generatedAt": "2026-10-07T07:57:45.055Z",
+  "totalAlerts": 25,
+  "counts": {
+    "block": 2,
+    "alert": 9,
+    "record": 14
+  },
+  "falsePositiveCount": 0,
+  "falsePositiveAlertIds": [],
+  "blockRuleCount": 1,
+  "blockRules": [
+    {
+      "sourceIp": "203.0.113.10",
+      "expiresAt": "2026-10-07T02:06:40.000Z",
+      "basisAlertIds": [
+        "ALERT-0010",
+        "ALERT-0011"
+      ]
+    }
+  ],
+  "expiryVerified": true,
+  "unrelatedIpPassed": true,
+  "note": "합성 시험 경보 기준 결과입니다. 실제 Wazuh 운영 경보·Jev 연동 결과가 아닙니다."
+}

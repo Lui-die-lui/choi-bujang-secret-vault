@@ -82,6 +82,17 @@ git show HEAD:public/data.json
 
 **이번 단계로 막은 길**: 로그인한 사람의 진짜 토큰이나 공개 anon 키로 Supabase Data API(`/rest/v1/...`)를 직접 불러 자료에 접근하던 경로가 `t02_vault_notes`·`t03_personal_notes` 모두에서 막혔습니다. 브라우저도 이제 Auth 호출을 제외하면 우리 서버 함수만 거칩니다.
 
+## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
+
+**새로 만든 구성임을 밝힙니다**: 이 과제 시점(5단계)에는 `src/decider.mjs`가 아직 시작 틀 그대로(`starter.deny`, 6단계부터 규칙을 채우는 계약)라서, 그 파일과 `RULE_IDS`는 건드리지 않았습니다. 대신 **별도의 새 부품**(`xdr/brute-force/*`, `src/xdr-login-guard.mjs`, `supabase/xdr_blocklist.local.sql`)을 만들어 기존 로그인 접근 제어(`api/auth/login.mjs`) 앞에 추가 확인 한 단계로 꽂았습니다. 판정기 규칙을 대신하지 않고, 기존 로그인 동작(이메일·비밀번호 검증, 401/400/405/500 응답)은 그대로 보존합니다.
+
+- **경보 읽기** (`xdr/brute-force/read-alerts.mjs`): `xdr/fixtures/brute-force.json`(**합성 시험 자료**, 실제 Wazuh 배포에서 뽑은 게 아님)에서 시각·출발 주소·계정·규칙 수준·설명만 추출합니다. 근거 경보 번호(`id`)는 추출 결과와 분리해 내부 추적용으로만 돌려주고, 원본 경보 건수와 추출 건수가 다르면 예외를 던집니다.
+- **패턴** (`xdr/brute-force/patterns.json`): 같은 출발 주소·계정의 반복 실패(MITRE ATT&CK T1110.001), 그 애매한 구간, 같은 출발 주소의 여러 계정 대상 실패(비밀번호 추측 의심, MITRE ATT&CK T1110.003)를 패턴 이름·조건·근거 한 줄로 정리했습니다. 실패 로그만으로 "같은 비밀번호 사용"을 단정하지 않고 의심 신호로만 구분합니다.
+- **판단** (`xdr/brute-force/decide.mjs`): `decide(alert)`가 출발 주소별 시간 창(기본 10분) 집계를 관리하며 `{action, confidence, reason}`을 돌려줍니다. confidence ≥0.85 block, ≥0.5 alert, 그 아래 record. 애매한 구간만 `xdr/brute-force/jev-client.mjs`로 Jev에 확신도를 묻고, **이 저장소에는 실제 Jev 주소·키 정보가 없어** `JEV_ENDPOINT`/`JEV_API_KEY` 환경변수가 없으면 호출 자체를 하지 않고 바로 alert 기본값으로 떨어집니다(응답 실패·시간 초과·잘못된 응답도 동일). 실제 Jev 연동이 필요하면 그 주소·키를 Vercel/로컬 환경변수 화면에 직접 넣으세요(이 코드에는 적지 않습니다).
+- **차단 연결** (`xdr/brute-force/block-rules.mjs`, `src/xdr-login-guard.mjs`, `supabase/xdr_blocklist.local.sql`): block 판정만 만료 시각·근거 경보 번호가 붙은 임시 거부 규칙으로 올라가고, 같은 출발 주소가 다시 block돼도 규칙이 중복 생성되지 않습니다(근거 번호만 합쳐짐). 알림(block·alert)은 비밀값 없이 `xdr/alerts.log`에 한 줄씩 쌓입니다(`.gitignore` 대상, Git에 올라가지 않음). Vercel의 상태 없는 서버 함수 사이에서도 차단이 유지되도록, 기존 Supabase DB에 새 표 `public.xdr_brute_force_blocklist`를 쓰며(`supabase/xdr_blocklist.local.sql`, 로컬 전용 SQL, 학생이 직접 실행해야 적용됨), `api/auth/login.mjs`가 로그인 시도 전에 `src/xdr-login-guard.mjs`로 이 표를 확인해 403으로 거부합니다. DB 조회가 실패하면 정상 로그인이 막히지 않도록 열어 둡니다(fail-open, 콘솔 오류만 남김).
+- **다시 실행하는 방법**: `npm run xdr:run -- brute-force`로 합성 시험 경보를 돌려 `xdr/brute-force/result.json`(block·alert·record 건수, 정상 이벤트 오차단 건수, 차단 만료 검증, 무관 주소 통과 여부)을 갱신합니다. 이번 실행 결과: 전체 25건 중 **block 2·alert 9·record 14**, 정상 이벤트 오차단 **0건**, 만료 검증·무관 주소 통과 모두 **true**.
+- **아직 연결되지 않은 부분(정직하게 남김)**: 실제 Wazuh 운영 경보를 이 모듈로 흘려보내는 수집 파이프라인은 없습니다(합성 fixture만 있음). 실제 Jev 엔드포인트도 없어 애매한 경우는 전부 alert 기본값으로 처리됩니다. `supabase/xdr_blocklist.local.sql`을 학생이 Supabase에서 실제로 실행하기 전에는, 로그인 쪽 차단 검사가 DB 조회 실패로 항상 열려 있습니다(fail-open). 이 셋 중 무엇도 "운영 심판 판정"이나 "실제 공격 차단 증거"로 보고하지 않습니다 — `npm run xdr:run`은 합성 자료로 하는 학생 연습입니다.
+
 ## 시작 틀의 자동 처리
 
 `vercel.json`은 정적 결과물 `public`을 배포합니다. 빌드 명령 `npm run build`는 Vercel이 제공하는 GitHub 저장소 소유자·이름, 커밋 SHA, 배포 URL을 검증하고 `public/aleph.json`을 생성합니다. 이 값이 없으면 빌드가 실패하므로, 성공한 것처럼 빈 주소를 내보내지 않습니다. `aleph.json`의 내용만으로 저장소 소유권이나 방어 성공을 인정하지 않습니다. 심판이 공개 저장소의 실제 커밋과 배포된 자료를 따로 대조해야 합니다.
