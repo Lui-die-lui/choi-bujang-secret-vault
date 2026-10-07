@@ -1,22 +1,35 @@
 {
   "schema": "xdr.brute-force.result.v1",
-  "generatedAt": "2026-10-07T08:35:12.058Z",
+  "generatedAt": "2026-10-07T10:49:00.727Z",
   "totalAlerts": 25,
   "counts": {
-    "block": 2,
-    "alert": 9,
+    "block": 9,
+    "alert": 2,
     "record": 14
   },
   "falsePositiveCount": 0,
   "falsePositiveAlertIds": [],
-  "blockRuleCount": 1,
+  "blockRuleCount": 2,
   "blockRules": [
     {
       "sourceIp": "203.0.113.10",
       "expiresAt": "2026-10-07T02:06:40.000Z",
       "basisAlertIds": [
+        "ALERT-0005",
+        "ALERT-0006",
+        "ALERT-0007",
+        "ALERT-0008",
+        "ALERT-0009",
         "ALERT-0010",
         "ALERT-0011"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.22",
+      "expiresAt": "2026-10-07T03:07:30.000Z",
+      "basisAlertIds": [
+        "ALERT-0016",
+        "ALERT-0017"
       ]
     }
   ],
@@ -30,7 +43,7 @@
     },
     {
       "name": "애매한 시도는 차단하지 않음",
-      "sourceIp": "198.51.100.22",
+      "sourceIp": "198.51.100.77",
       "expectedBlocked": false,
       "actualBlocked": false,
       "passed": true

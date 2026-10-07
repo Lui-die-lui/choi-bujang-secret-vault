@@ -28,6 +28,9 @@ function actionForConfidence(confidence) {
 }
 
 // alert는 read-alerts.mjs가 뽑은 { time, sourceIp, account, ruleLevel, description } 형식입니다.
+// 같은 출발 주소·같은 계정만 반복해서 겨냥하는 실패는(여러 계정을 흩어서 노리는
+// spray와 달리) 대상이 하나로 명확해 애매할 이유가 없으므로, 문턱을 넘으면 Jev를
+// 거치지 않고 바로 block으로 판단합니다. 애매함은 "여러 계정 대상"에만 적용됩니다.
 export async function decide(alert) {
   const nowMs = Date.parse(alert.time);
   const existing = windowBySourceIp.get(alert.sourceIp) ?? [];
@@ -38,23 +41,13 @@ export async function decide(alert) {
   const sameAccountCount = pruned.filter((entry) => entry.account === alert.account).length;
   const distinctAccounts = new Set(pruned.map((entry) => entry.account));
 
-  if (sameAccountCount >= config.highFailureThreshold) {
+  if (sameAccountCount >= config.failureThreshold) {
     const pattern = patternByName.get('repeated_failed_logins_same_source_account');
     return {
       action: 'block',
       confidence: 0.95,
       reason: `같은 출발 주소·계정 반복 실패 ${sameAccountCount}회 (${pattern.name})`,
     };
-  }
-
-  if (sameAccountCount >= config.mediumFailureThreshold) {
-    const pattern = patternByName.get('ambiguous_repeated_failed_logins_same_source_account');
-    const jevResult = await askJev({
-      pattern: pattern.name, sourceIp: alert.sourceIp, sameAccountCount, windowSeconds: config.windowSeconds,
-    });
-    const confidence = jevResult ? clampConfidence(jevResult.confidence) : 0.6;
-    const reasonSuffix = jevResult ? 'Jev 확신도 반영' : 'Jev 미응답, 기본 확신도 적용';
-    return { action: actionForConfidence(confidence), confidence, reason: `${pattern.name} (${reasonSuffix})` };
   }
 
   if (distinctAccounts.size >= config.distinctAccountThreshold) {

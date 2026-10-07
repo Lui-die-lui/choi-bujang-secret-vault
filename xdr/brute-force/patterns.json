@@ -1,25 +1,19 @@
 {
   "config": {
     "windowSeconds": 600,
-    "mediumFailureThreshold": 5,
-    "highFailureThreshold": 10,
+    "failureThreshold": 5,
     "distinctAccountThreshold": 4,
     "blockDurationSeconds": 3600
   },
   "patterns": [
     {
       "name": "repeated_failed_logins_same_source_account",
-      "condition": "같은 출발 주소·같은 계정의 로그인 실패가 windowSeconds(10분) 안에 highFailureThreshold(10)회 이상 쌓임",
+      "condition": "같은 출발 주소·같은 계정의 로그인 실패가 windowSeconds(10분) 안에 failureThreshold(5)회 이상 쌓임 — 한 계정만 겨냥한 반복 실패이므로 명확한 공격 시도로 간주함(Jev를 거치지 않고 바로 block)",
       "reference": "MITRE ATT&CK T1110.001 Brute Force: Password Guessing (https://attack.mitre.org/techniques/T1110/001/)"
     },
     {
-      "name": "ambiguous_repeated_failed_logins_same_source_account",
-      "condition": "같은 출발 주소·같은 계정의 실패가 windowSeconds 안에 mediumFailureThreshold(5) 이상 highFailureThreshold 미만으로 쌓여 공격 여부가 아직 불확실함",
-      "reference": "MITRE ATT&CK T1110 Brute Force (https://attack.mitre.org/techniques/T1110/)"
-    },
-    {
       "name": "credential_spray_multi_account_same_source",
-      "condition": "같은 출발 주소가 windowSeconds 안에 서로 다른 계정 distinctAccountThreshold(4)개 이상을 대상으로 실패 로그를 남김. 실패 로그만으로는 같은 비밀번호 사용을 단정할 수 없어 의심 신호로만 구분함",
+      "condition": "같은 출발 주소가 windowSeconds 안에 서로 다른 계정 distinctAccountThreshold(4)개 이상을 대상으로 실패 로그를 남김. 실패 로그만으로는 같은 비밀번호 사용을 단정할 수 없어 의심 신호로만 구분함(Jev에게 확신도를 물음)",
       "reference": "MITRE ATT&CK T1110.003 Brute Force: Password Spraying (https://attack.mitre.org/techniques/T1110/003/)"
     }
   ]

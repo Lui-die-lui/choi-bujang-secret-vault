@@ -116,7 +116,7 @@ export async function run() {
     ? await runEndToEndChecks({
       blocklist,
       attackIp: '203.0.113.10',
-      ambiguousIp: '198.51.100.22',
+      ambiguousIp: '198.51.100.77',
       benignIp: '203.0.113.99',
       unrelatedIp: '203.0.113.254',
       nowMs: attackEntry.expiresAtMs - 1,
