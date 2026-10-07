@@ -84,7 +84,9 @@ git show HEAD:public/data.json
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
 
-**왜 `src/decider.mjs`(ZTNA 판정기)가 아니라 `api/auth/login.mjs`에 연결했는가**: 이 과제 시점(5단계)에 `AGENTS.md`는 "6단계부터 `src/decider.mjs`를 고칠 때는..."이라고 명시해, 지금 그 파일·`RULE_IDS`를 고치는 것 자체를 금지합니다. 그리고 그 전에 더 근본적인 문제가 있습니다 — `docs/DECIDER_REQUEST.md`가 정의한 요청 계약(18개 필드: `schema`, `requestId`, `classId`, `projectId`, `subjectId`, `deviceId`, `service`, `method`, `path`, `route`, `queryLength`, `querySha256`, `at`, `policyRevision`, `deviceRegistered`, `stepUp`, `recentEvents`, `signals`)에는 **출발 IP를 담는 필드가 아예 없습니다**(`signals.source`는 실제 경로에서 늘 `"none"`). 즉 6단계가 되어 `decider.mjs`를 고칠 수 있게 되더라도, 지금 계약으로는 `decide(request)` 안에서 IP 기반 차단을 구현할 길이 없습니다(계약에 없는 `request.sourceIp` 같은 필드를 임의로 만드는 것도 금지되어 있음). 또한 `decide()`는 `scripts/decider-test.mjs`·`scripts/fixture-7.mjs`·`scripts/bundle.mjs`(로컬 개발·빌드 스크립트)와 외부 반 엔진에서만 호출되고, 이 저장소의 `api/*.mjs` 어디에서도 호출되지 않습니다 — 이 앱의 실제 요청 처리에는 지금 작동하는 ZTNA 판정기가 없습니다. **로그인 가드(`src/xdr-login-guard.mjs`)는 판정기와 동등하거나 그걸 대신하는 것이 아닙니다** — 판정기가 구조적으로 볼 수 없는 신호(실제 IP)에 대해서만 작동하는, 로그인 경로 앞에 붙는 좁은 범위의 별도 부품입니다. 과제 자체의 "ZTNA 판정기가 없으면 기존 접근 제어에 연결" 조항이 이 상황(계약상 판정기가 이 신호를 다룰 수 없음)에 해당한다고 보고 이렇게 연결했습니다. 6단계 이후 계약에 관련 필드가 추가되면 판정기 쪽으로 옮기는 게 더 맞습니다.
+**왜 `src/decider.mjs`(ZTNA 판정기)가 아니라 `api/auth/login.mjs`에 연결했는가**: `AGENTS.md`를 다시 정확히 확인했습니다 — "5단계에는 `decider.mjs`를 고치면 안 된다"는 **독립된 금지 문장은 없습니다**. 실제 문장은 "6단계부터 `src/decider.mjs`를 고칠 때는 `docs/DECIDER_REQUEST.md`의 실제 요청·응답 계약을 먼저 읽으세요..."로, 이건 6단계부터 그 파일을 **고칠 때 지켜야 할 절차**(계약 먼저 읽기, 계약에 없는 필드 금지, 함수 모양 유지)를 설명하는 조건문이며, "9단계부터 `src/detect.mjs`를 고칠 때는..." 문장과 같은 구조입니다 — 두 파일이 각각 어느 단계 커리큘럼에 속하는지를 가리킬 뿐, 그 전 단계에서의 수정을 명시적으로 금지하는 별도 조항은 아닙니다. 그래서 이전 설명("금지합니다")은 과장이었고, 이렇게 정정합니다.
+
+다만 연결 지점을 바꿀 필요는 없습니다 — 더 결정적인 이유가 따로 있습니다. `docs/DECIDER_REQUEST.md`가 정의한 요청 계약(18개 필드: `schema`, `requestId`, `classId`, `projectId`, `subjectId`, `deviceId`, `service`, `method`, `path`, `route`, `queryLength`, `querySha256`, `at`, `policyRevision`, `deviceRegistered`, `stepUp`, `recentEvents`, `signals`)에는 **출발 IP를 담는 필드가 아예 없습니다**(`signals.source`는 실제 경로에서 늘 `"none"`). 즉 설령 지금 `decider.mjs`를 고쳐도 되더라도, 이 계약으로는 `decide(request)` 안에서 IP 기반 차단을 구현할 길이 없습니다(계약에 없는 `request.sourceIp` 같은 필드를 임의로 만드는 것은 별도로, 명시적으로 금지되어 있음 — "현재 계약에 없는 `request.device`, `request.identity`, `request.geo`, `request.role`을 만들어 쓰지 마세요"). 또한 `decide()`는 `scripts/decider-test.mjs`·`scripts/fixture-7.mjs`·`scripts/bundle.mjs`(로컬 개발·빌드 스크립트)와 외부 반 엔진에서만 호출되고, 이 저장소의 `api/*.mjs` 어디에서도 호출되지 않습니다 — 이 앱의 실제 요청 처리에는 지금 작동하는 ZTNA 판정기가 없습니다. **로그인 가드(`src/xdr-login-guard.mjs`)는 판정기와 동등하거나 그걸 대신하는 것이 아닙니다** — 판정기가 계약상 볼 수 없는 신호(실제 IP)에 대해서만 작동하는, 로그인 경로 앞에 붙는 좁은 범위의 별도 부품입니다. 과제 자체의 "ZTNA 판정기가 없으면 기존 접근 제어에 연결" 조항이 이 상황(계약상 판정기가 이 신호를 다룰 수 없음)에 해당한다고 보고 이렇게 연결했습니다. 나중에 계약에 관련 필드가 추가되면 판정기 쪽으로 옮기는 게 더 맞습니다.
 
 ### 구현된 전체 경로
 
@@ -121,7 +123,21 @@ git show HEAD:public/data.json
 
 - `npm run xdr:sync -- brute-force` (플래그 없음): **미리보기만**. 로컬 `blocklist.json`의 만료되지 않은 항목을 보여주기만 하고 DB에 쓰지 않습니다. (SUPABASE_URL/SUPABASE_SECRET_KEY가 없는 이 세션에서 실행해 확인함 — 안전하게 "환경변수 없음" 안내만 출력됨.)
 - `npm run xdr:sync -- brute-force --probe`: **실제 DB 왕복 자체 점검**. 표시용 행 1개(RFC 5737 문서용 주소, 실사용자와 안 겹침)를 운영 표에 넣고 → `src/xdr-login-guard.mjs`의 실제 운영 저장소(`createSupabaseBlocklistStore`)로 조회해 맞게 읽히는지 확인하고 → 그 행을 지웁니다. 끝나면 운영 표에 아무것도 남지 않습니다. **이 세션에는 실제 Supabase 자격 정보가 없어 이 모드를 실행해 확인하지 못했습니다** — 학생이 자신의 `SUPABASE_URL`/`SUPABASE_SECRET_KEY`를 로컬 환경변수에 넣고 직접 실행해야 합니다(이 코드나 대화에는 그 값을 적지 않음).
-- `npm run xdr:sync -- brute-force --confirm`: 로컬 `blocklist.json`의 만료되지 않은 항목을 실제로 운영 표에 올립니다. 지금은 합성 fixture만 있어 RFC 5737 주소가 올라가므로, 평소에는 `--probe`만 쓰는 걸 권장합니다.
+- `npm run xdr:sync -- brute-force --confirm`: 로컬 `blocklist.json`의 만료되지 않은 항목을 실제로 운영 표에 올립니다. **지금은 쓰지 마세요** — 지금 저장소에는 합성 fixture만 있어, 이 명령을 쓰면 RFC 5737 문서용 주소가 운영 차단 표에 그대로 올라갑니다. 실제 공격 IP를 다룰 수 있게 되기 전까지는 `--probe`만 쓰세요.
+
+### 운영 검증 한눈에 보기
+
+| 항목 | 값 |
+|---|---|
+| SQL | `supabase/xdr_blocklist.local.sql` (Supabase SQL Editor에서 한 번 실행) |
+| 환경변수 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (로그인 기능이 이미 쓰는 것과 같은 이름·값, Vercel 환경변수 화면에 직접 입력) |
+
+| 명령 | 하는 일 | 기대 결과 |
+|---|---|---|
+| `npm run xdr:run -- brute-force` | 로컬·격리 저장소로만 탐지+전체 경로 시험 (Supabase 미접속) | `block 2 · alert 9 · record 14`, 오차단 `0`, 전체 경로 시험 `6건 중 통과 6건` |
+| `npm run xdr:sync -- brute-force` | 운영 DB 미리보기만, 아무것도 안 씀 | "미리보기만 합니다(DB에 아무것도 쓰지 않음)" |
+| `npm run xdr:sync -- brute-force --probe` | 운영 Supabase에 시험 행 1개 넣고→조회→지움(왕복 자체 점검) | 마지막 줄이 `... true (기대값 true)`, 종료 코드 0 |
+| `npm run xdr:sync -- brute-force --confirm` | **지금은 실행하지 않음** — 실행하면 합성 fixture의 RFC 5737 주소가 운영 표에 올라감 | — |
 
 ### Jev: 이 저장소에 있는 것과 실제로 필요한 것
 
@@ -129,11 +145,12 @@ git show HEAD:public/data.json
 
 ### 아직 충족하지 못한 조건 (정직하게 남김)
 
-1. 실제 Wazuh 운영 경보 수집 파이프라인 없음(합성 fixture만).
-2. 실제 Jev 엔드포인트·키 없음(미응답 경로만 시험됨, 위 "Jev" 절 참고).
-3. `npm run xdr:sync -- brute-force --probe`/`--confirm`을 실제 Supabase 자격 정보로 실행해 확인한 적 없음(코드는 작성·구문 검사만 했음, 이 세션에는 자격 정보가 없음).
-4. 위에서 설계한 전체 경로는 격리된 메모리 저장소로는 자동 검증됐지만, **실제 배포된 Vercel 함수 + 실제 Supabase 표**로의 왕복은 아직 실행해 확인하지 않았습니다.
-5. `x-vercel-forwarded-for` 우선순위 로직이 실제 Vercel 요청에서 기대한 값을 주는지는 아직 실제 배포 로그로 확인하지 않았습니다(공식 문서 문구 기준으로만 구현).
+과제 원문은 Wazuh 수집을 `xdr/fixtures/brute-force.json` **fixture 읽기**로 정의하고 있어(실시간 수집 파이프라인 구축을 요구하지 않음), 그 자체는 미충족 항목이 아닙니다 — 다만 지금 쓰는 fixture는 **합성 자료**이고 실제 Wazuh 배포에서 뽑은 게 아니라는 점은 그대로입니다.
+
+1. 실제 Jev 엔드포인트·키 없음(미응답 경로만 시험됨, 위 "Jev" 절 참고).
+2. `npm run xdr:sync -- brute-force --probe`를 실제 Supabase 자격 정보로 실행해 확인한 적 없음(코드는 작성·구문 검사만 했음, 이 세션에는 자격 정보가 없음).
+3. 위에서 설계한 전체 경로는 격리된 메모리 저장소로는 자동 검증됐지만, **실제 배포된 Vercel 함수 + 실제 Supabase 표**로의 왕복은 아직 실행해 확인하지 않았습니다.
+4. `x-vercel-forwarded-for` 우선순위 로직이 실제 Vercel 요청에서 기대한 값을 주는지는 아직 실제 배포 로그로 확인하지 않았습니다(공식 문서 문구 기준으로만 구현).
 
 이 중 무엇도 "운영 심판 판정"이나 "실제 공격 차단 증거"로 보고하지 않습니다 — `npm run xdr:run`은 격리된 저장소로 하는 로컬 학생 연습이고, `npm run xdr:sync`는 실제 DB에 닿는 별도의 명시적 명령입니다.
 
