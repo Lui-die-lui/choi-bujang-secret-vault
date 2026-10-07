@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readAlerts } from './read-alerts.mjs';
-import { decide, resetDecideState } from './decide.mjs';
+import { decide, primeWindow, resetDecideState } from './decide.mjs';
 import { loadBlocklist, saveBlocklist, upsertBlock, pruneExpired } from './block-rules.mjs';
 import { createMemoryBlocklistStore, extractSourceIp, isSourceBlocked } from '../../src/xdr-login-guard.mjs';
 
@@ -71,6 +71,11 @@ export async function run() {
 
   const expectedRaw = JSON.parse(readFileSync(expectedPath, 'utf8'));
   const expectedByAlertId = expectedRaw.byAlertId ?? {};
+
+  // 이미 다 모인 경보 묶음이므로(실시간 스트림이 아님), decide()를 호출하기
+  // 전에 전체 배치를 먼저 채워 둡니다 — 한 공격에 속한 경보라면 맨 처음
+  // 것부터도 같은 판단을 받게 하기 위함입니다(decide.mjs의 primeWindow 설명 참고).
+  primeWindow(records);
 
   // 격리된 시험 저장소: 이번 실행 동안만 쓰는 로컬 블록리스트입니다. 운영
   // Supabase 표와는 완전히 분리되어 있고, 이 함수 안에서는 네트워크 호출이

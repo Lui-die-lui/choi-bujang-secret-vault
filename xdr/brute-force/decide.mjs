@@ -1,6 +1,8 @@
 // 뽑은 경보를 패턴과 맞춰 본 뒤, 애매한 건만 Jev에게 확신도를 물어 action을 정합니다.
-// decide(alert) 하나만 내보냅니다. 이 모듈은 같은 프로세스 안에서 호출되는 순서대로
-// 시간 창의 집계 상태(출발 주소별 최근 실패 목록)를 관리합니다.
+// decide(alert) 하나만 내보냅니다(인자·반환 모양은 바뀌지 않음). 시간 창의 집계
+// 상태(출발 주소별 실패 목록)는 이 모듈이 관리하며, run.mjs가 호출하는
+// primeWindow(records)로 배치 전체를 먼저 채워 둡니다 — 그래야 한 공격에 속한
+// 경보라면 맨 처음 것부터도 같은 판단을 받습니다(아래 primeWindow 설명 참고).
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,10 +13,27 @@ const { config, patterns } = JSON.parse(readFileSync(resolve(moduleDir, 'pattern
 const patternByName = new Map(patterns.map((pattern) => [pattern.name, pattern]));
 
 const windowBySourceIp = new Map();
+let primed = false;
 
 function pruneWindow(entries, nowMs) {
   const windowMs = config.windowSeconds * 1000;
-  return entries.filter((entry) => nowMs - entry.timeMs <= windowMs);
+  return entries.filter((entry) => Math.abs(nowMs - entry.timeMs) <= windowMs);
+}
+
+// run.mjs가 전체 배치를 돌리기 전에 한 번 불러 둡니다. 이미 다 모인 경보
+// 묶음을 다루는 것이라(실시간 스트림이 아님), 한 출발 주소·계정의 경보를
+// 전부 먼저 모아 두면, 같은 공격에 속한 경보라면 맨 처음 것부터도 같은
+// 판단(sameAccountCount·distinctAccounts)을 받습니다 — "나중에 기준을
+// 넘긴 뒤에야" 블록되는 게 아니라, 그 공격에 속한 경보 전체가 한 번에
+// 판단됩니다.
+export function primeWindow(records) {
+  windowBySourceIp.clear();
+  for (const record of records) {
+    const list = windowBySourceIp.get(record.sourceIp) ?? [];
+    list.push({ timeMs: Date.parse(record.time), account: record.account });
+    windowBySourceIp.set(record.sourceIp, list);
+  }
+  primed = true;
 }
 
 function clampConfidence(value) {
@@ -33,10 +52,14 @@ function actionForConfidence(confidence) {
 // 거치지 않고 바로 block으로 판단합니다. 애매함은 "여러 계정 대상"에만 적용됩니다.
 export async function decide(alert) {
   const nowMs = Date.parse(alert.time);
-  const existing = windowBySourceIp.get(alert.sourceIp) ?? [];
-  const pruned = pruneWindow(existing, nowMs);
-  pruned.push({ timeMs: nowMs, account: alert.account });
-  windowBySourceIp.set(alert.sourceIp, pruned);
+  let entries = windowBySourceIp.get(alert.sourceIp) ?? [];
+  if (!primed) {
+    // primeWindow 없이 decide()만 바로 호출되는 경우를 위한 대비책 — 그때는
+    // 호출 순서대로 누적하는 이전 방식(실시간 스트림 가정)으로 동작합니다.
+    entries = [...entries, { timeMs: nowMs, account: alert.account }];
+    windowBySourceIp.set(alert.sourceIp, entries);
+  }
+  const pruned = pruneWindow(entries, nowMs);
 
   const sameAccountCount = pruned.filter((entry) => entry.account === alert.account).length;
   const distinctAccounts = new Set(pruned.map((entry) => entry.account));
@@ -67,4 +90,5 @@ export async function decide(alert) {
 // 시험·재실행 사이에 집계 상태를 초기화합니다(run.mjs가 매 실행 시작 전에 호출).
 export function resetDecideState() {
   windowBySourceIp.clear();
+  primed = false;
 }

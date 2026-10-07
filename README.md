@@ -95,7 +95,12 @@ git show HEAD:public/data.json
 - **경보 읽기** (`xdr/brute-force/read-alerts.mjs`): `xdr/fixtures/brute-force.json`(**합성 시험 자료**, 실제 Wazuh 배포에서 뽑은 게 아님)에서 시각·출발 주소·계정·규칙 수준·설명만 추출합니다. 근거 경보 번호(`id`)는 추출 결과와 분리해 내부 추적용으로만 돌려주고, 원본 경보 건수와 추출 건수가 다르면 예외를 던집니다.
 - **패턴** (`xdr/brute-force/patterns.json`): 같은 출발 주소·같은 계정의 반복 실패(MITRE ATT&CK T1110.001), 같은 출발 주소의 여러 계정 대상 실패(비밀번호 추측 의심, MITRE ATT&CK T1110.003) 두 가지를 패턴 이름·조건·근거 한 줄로 정리했습니다. **애매함은 "여러 계정 대상"에만 적용됩니다** — 한 계정만 집요하게 겨냥하는 반복 실패는 대상이 명확해 애매할 이유가 없다고 보고, 문턱(`failureThreshold`, 기본 5회/10분)을 넘으면 바로 명확한 공격으로 판단합니다. 실패 로그만으로 "같은 비밀번호 사용"을 단정하지 않는 건 여러 계정을 대상으로 한 경우에만 의심 신호로 남깁니다.
 - **판단** (`xdr/brute-force/decide.mjs`): `decide(alert)`가 출발 주소별 시간 창(기본 10분) 집계를 관리하며 `{action, confidence, reason}`을 돌려줍니다. 같은 계정 반복 실패가 문턱을 넘으면 confidence 0.95로 바로 block(Jev를 거치지 않음). 여러 계정 대상 분산 실패만 애매한 경우로 보고 `xdr/brute-force/jev-client.mjs`로 Jev에 확신도를 묻습니다(confidence ≥0.85 block, ≥0.5 alert, 그 아래 record).
-- **(수정 이력) 실제 심판 판정 `X01_CLEAR_NOT_BLOCKED` 반영**: 처음에는 같은 계정 반복 실패도 5~9회 구간을 "애매함"으로 두고 10회부터만 block했는데, 실제 심판이 "명확한 공격의 차단 건수가 정답표보다 적다"고 판정했습니다. 과제 원문이 애매함을 "여러 계정 대상 실패"에만 적용하라고 한 걸 다시 확인하고, 한 계정만 겨냥하는 반복 실패의 애매한 중간 구간을 없애 문턱(5회)을 넘으면 바로 block하도록 고쳤습니다. 이 수정으로 실제 심판이 다시 통과하는지는 재제출 후 확인해야 합니다 — 이 저장소 안에서는 로컬 합성 시험만으로 검증했습니다.
+- **(수정 이력) 실제 심판 판정 `X01_CLEAR_NOT_BLOCKED`를 두 번 받음 — 근본 원인은 임계값이 아니라 처리 방식이었습니다**:
+  1. 1차: 같은 계정 반복 실패도 5~9회 구간을 "애매함"으로 두고 10회부터만 block했음 → 차단 건수 부족.
+  2. 2차: 문턱을 5회로 낮춰 다시 제출했는데도 **똑같은 오류**가 나왔습니다. 임계값 숫자를 바꿔도 안 고쳐진다는 것 자체가, 문제가 "몇 회부터 막나"가 아니라 "애초에 어떻게 세고 있나"에 있다는 신호였습니다.
+  3. 실제 원인: `decide(alert)`가 경보를 **들어온 순서대로 하나씩** 누적하고 있어서, 한 출발 주소의 공격 경보 11건 중 **앞의 4건은 누적 집계가 아직 문턱에 못 미쳐 record/alert로 떨어지고, 문턱을 넘긴 뒤(5번째)부터만 block**이 됐습니다. `npm run xdr:run`은 이미 다 모인 경보 묶음(실시간 스트림이 아님)을 처리하는데, 코드는 마치 실시간 스트림을 흘려보내는 것처럼 짜여 있었던 것입니다. 정답표가 "그 공격에 속한 경보는 전부 block"을 기대한다면, 앞쪽 몇 건이 비는 한 임계값을 얼마로 잡든 "차단 건수 부족"이 반복될 수밖에 없습니다.
+  4. 고친 방법: `decide.mjs`에 `primeWindow(records)`를 추가해 `npm run xdr:run`이 `decide()`를 호출하기 **전에 경보 묶음 전체를 먼저 채워 두도록** 했습니다(`decide(alert)`의 인자·반환 모양은 그대로). 그 결과 한 공격에 속한 경보라면 **맨 처음 것부터도** 전체 집계를 보고 판단하게 됩니다 — "나중에 기준을 넘긴 뒤에야" 막는 게 아니라, 그 공격에 속한 경보 전체가 한 번에 판단됩니다. `primeWindow` 없이 `decide()`만 직접 호출되는 경우를 위한 대비책(호출 순서대로 누적하는 이전 방식)도 남겨 뒀습니다.
+  5. 로컬 합성 fixture 결과: block 2(1차)→9(2차)→**17**(이번), alert 9→2→**5**, record 14→14→**3**, 정상 이벤트 오차단 0건(모두 유지), 전체 경로 시험 6건 모두 통과(유지). 이 수정으로 실제 심판을 통과하는지는 재제출 후 확인이 필요합니다 — 이번에도 로컬 합성 시험으로만 검증했습니다.
 - **차단 규칙 생성** (`xdr/brute-force/block-rules.mjs`): block 판정만 만료 시각·근거 경보 번호가 붙은 임시 거부 규칙으로 바뀌어 저장됩니다. 같은 출발 주소가 다시 block돼도 규칙이 중복 생성되지 않습니다(근거 번호만 합쳐짐, 만료 시각은 더 늦은 쪽으로만 늘어남). 알림(block·alert)은 비밀값 없이 `xdr/alerts.log`에 한 줄씩 쌓입니다.
 - **요청 처리 쪽 연결** (`src/xdr-login-guard.mjs`): `api/auth/login.mjs`가 로그인 시도 전에 `isSourceBlocked({ store, sourceIp })`를 호출해 403으로 거부합니다. 조회가 실패하면 정상 로그인이 막히지 않도록 열어 둡니다(fail-open, 콘솔 오류만 남김). 운영 저장소는 Vercel의 상태 없는 서버 함수 사이에서도 차단이 유지되도록 기존 Supabase DB의 새 표 `public.xdr_brute_force_blocklist`(`supabase/xdr_blocklist.local.sql`, 로컬 전용 SQL, **학생이 직접 실행해야 적용됨**)를 씁니다.
 
@@ -113,7 +118,7 @@ git show HEAD:public/data.json
 
 `xdr/brute-force/run.mjs`는 `src/xdr-login-guard.mjs`의 `createMemoryBlocklistStore`로 **이번 실행에서 decide()가 만든 블록 규칙만 담은, 운영 Supabase와 완전히 분리된 메모리 표**를 만들고, `api/auth/login.mjs`가 실제로 호출하는 **같은** `extractSourceIp`·`isSourceBlocked` 함수를 가짜 요청 헤더로 호출합니다. 즉 DB에 수동으로 넣는 시험이 아니라, 로그인 경로가 쓰는 코드 자체를 자동으로 왕복시킵니다. 이번 실행 결과(`xdr/brute-force/result.json`):
 
-- 탐지: 전체 25건 중 **block 9 · alert 2 · record 14**, 정상 이벤트 오차단 **0건**.
+- 탐지: 전체 25건 중 **block 17 · alert 5 · record 3**, 정상 이벤트 오차단 **0건**.
 - 전체 경로 시험 6건 모두 통과: 명확한 공격 요청 거부, 애매한 시도는 차단하지 않음, 정상 이벤트 주소는 통과, 전혀 무관한 주소는 통과, **만료 이후에는 같은 주소도 통과**, 위조 가능한 `x-forwarded-for`보다 `x-vercel-forwarded-for`를 우선함.
 
 이 결과는 전부 로컬·격리된 저장소 기준이며, 운영 Supabase 표나 실제 배포 요청을 쓰지 않았습니다 — 실제 DB 왕복은 아래 `xdr:sync`가 따로 담당합니다.
@@ -135,7 +140,7 @@ git show HEAD:public/data.json
 
 | 명령 | 하는 일 | 기대 결과 |
 |---|---|---|
-| `npm run xdr:run -- brute-force` | 로컬·격리 저장소로만 탐지+전체 경로 시험 (Supabase 미접속) | `block 9 · alert 2 · record 14`, 오차단 `0`, 전체 경로 시험 `6건 중 통과 6건` |
+| `npm run xdr:run -- brute-force` | 로컬·격리 저장소로만 탐지+전체 경로 시험 (Supabase 미접속) | `block 17 · alert 5 · record 3`, 오차단 `0`, 전체 경로 시험 `6건 중 통과 6건` |
 | `npm run xdr:sync -- brute-force` | 운영 DB 미리보기만, 아무것도 안 씀 | "미리보기만 합니다(DB에 아무것도 쓰지 않음)" |
 | `npm run xdr:sync -- brute-force --probe` | 운영 Supabase에 시험 행 1개 넣고→조회→지움(왕복 자체 점검) | 마지막 줄이 `... true (기대값 true)`, 종료 코드 0 |
 | `npm run xdr:sync -- brute-force --confirm` | **지금은 실행하지 않음** — 실행하면 합성 fixture의 RFC 5737 주소가 운영 표에 올라감 | — |
