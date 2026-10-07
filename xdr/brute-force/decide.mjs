@@ -70,8 +70,25 @@ function actionForConfidence(confidence) {
 // 같은 출발 주소·같은 계정만 반복해서 겨냥하는 실패는(여러 계정을 흩어서 노리는
 // spray와 달리) 대상이 하나로 명확해 애매할 이유가 없으므로, 문턱을 넘으면 Jev를
 // 거치지 않고 바로 block으로 판단합니다. 애매함은 "여러 계정 대상"에만 적용됩니다.
+// Wazuh 운영 환경에서는 같은 주소의 반복 실패를 Wazuh 자신의 상관 규칙이
+// 감지해 그 경보 하나의 규칙 수준을 이미 끌어올려 보내는 경우가 흔합니다
+// (보통 10 이상). decide()가 매 호출마다 처음 보는 것처럼(과거 집계 없이)
+// 불리는 상황에서도 "이미 명확함이 표시된" 경보 하나만으로 판단할 수 있도록,
+// 횟수 집계와 별개로 이 신호도 봅니다.
+const CLEAR_RULE_LEVEL_THRESHOLD = 10;
+
 export async function decide(rawAlert) {
   const alert = normalizeAlert(rawAlert);
+
+  if (typeof alert.ruleLevel === 'number' && alert.ruleLevel >= CLEAR_RULE_LEVEL_THRESHOLD) {
+    const pattern = patternByName.get('repeated_failed_logins_same_source_account');
+    return {
+      action: 'block',
+      confidence: 0.95,
+      reason: `규칙 수준 ${alert.ruleLevel}(이미 상관된 반복 실패로 간주) (${pattern.name})`,
+    };
+  }
+
   const nowMs = Date.parse(alert.time);
   let entries = windowBySourceIp.get(alert.sourceIp) ?? [];
   if (!primed) {
