@@ -1,3 +1,18 @@
+// (버그 수정 이력) recordFailureAndMaybeBlock이 처음에는 xdr/brute-force/patterns.json을
+// 런타임에 fs.readFileSync로 읽었는데, Vercel 서버 함수 배포본에서는 조용히
+// ENOENT로 실패했습니다(fail-open) — Vercel의 빌드 추적기는 import 문처럼 정적으로
+// 보이는 의존성만 묶어 넣고, 동적으로 계산한 경로의 readFileSync는 추적하지
+// 못합니다. 실제 배포 주소에 로그인 실패를 반복해서 보내 봤는데도 차단이 전혀
+// 안 걸려서(표도 비어 있었음) 알게 됐습니다. 파일을 아예 안 읽도록, 아래 상수로
+// 바꿨습니다(xdr/brute-force/patterns.json의 config와 같은 값 — 그 쪽을 바꾸면
+// 여기도 같이 바꿔 주세요. 이 파일은 Vercel 서버 함수에 배포되므로 배포본에
+// 확실히 포함되는 값만 써야 합니다).
+const LIVE_FAILURE_CONFIG = Object.freeze({
+  windowSeconds: 600,
+  failureThreshold: 5,
+  blockDurationSeconds: 3600,
+});
+
 // 보너스 xdr-01: 실제 로그인 요청(api/auth/login.mjs)에서 차단 목록을
 // 확인하는 추가 검사입니다. src/decider.mjs의 RULE_IDS·규칙이나
 // src/verify-login.mjs는 바꾸지 않습니다 — 기존 접근 제어 앞에 붙는
@@ -72,23 +87,13 @@ export async function isSourceBlocked({ store, sourceIp, nowMs = Date.now() }) {
   }
 }
 
-async function loadFailureThresholdConfig() {
-  const { readFileSync } = await import('node:fs');
-  const { dirname, resolve } = await import('node:path');
-  const { fileURLToPath } = await import('node:url');
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
-  const patternsPath = resolve(moduleDir, '..', 'xdr', 'brute-force', 'patterns.json');
-  const { config } = JSON.parse(readFileSync(patternsPath, 'utf8'));
-  return config;
-}
-
 // 로그인 실패 하나를 기록하고, 같은 출발 주소·계정의 실패가 문턱을 넘으면
 // xdr_brute_force_blocklist에 차단 규칙을 올립니다. sourceIp가 없으면(헤더를
 // 못 읽은 경우) 아무 것도 하지 않습니다 — 누구를 차단할지 알 수 없기 때문입니다.
 export async function recordFailureAndMaybeBlock({ supabaseUrl, supabaseSecretKey, sourceIp, account, nowMs = Date.now() }) {
   if (!supabaseUrl || !supabaseSecretKey || !sourceIp || !account) return;
   try {
-    const config = await loadFailureThresholdConfig();
+    const config = LIVE_FAILURE_CONFIG;
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(supabaseUrl, supabaseSecretKey, {
       auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
