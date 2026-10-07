@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { extractSourceIp, isSourceBlocked } from '../../src/xdr-login-guard.mjs';
+import { createSupabaseBlocklistStore, extractSourceIp, isSourceBlocked } from '../../src/xdr-login-guard.mjs';
 
 // 5단계: 로그인을 서버 함수가 대신 처리해, 화면 코드에는 Supabase 공개 키가
 // 전혀 없습니다. 공식 SDK의 signInWithPassword만 쓰고 JWT를 직접 만들지
@@ -22,7 +22,8 @@ export default async function handler(request, response) {
   }
 
   const sourceIp = extractSourceIp(request);
-  if (await isSourceBlocked({ supabaseUrl, supabaseSecretKey, sourceIp })) {
+  const blocklistStore = createSupabaseBlocklistStore({ supabaseUrl, supabaseSecretKey });
+  if (await isSourceBlocked({ store: blocklistStore, sourceIp })) {
     return response.status(403).json({ error: 'temporarily_blocked' });
   }
 

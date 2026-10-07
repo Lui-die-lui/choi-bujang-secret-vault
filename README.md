@@ -84,27 +84,58 @@ git show HEAD:public/data.json
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
 
-**새로 만든 구성임을 밝힙니다**: 이 과제 시점(5단계)에는 `src/decider.mjs`가 아직 시작 틀 그대로(`starter.deny`, 6단계부터 규칙을 채우는 계약)라서, 그 파일과 `RULE_IDS`는 건드리지 않았습니다. 대신 **별도의 새 부품**(`xdr/brute-force/*`, `src/xdr-login-guard.mjs`, `supabase/xdr_blocklist.local.sql`)을 만들어 기존 로그인 접근 제어(`api/auth/login.mjs`) 앞에 추가 확인 한 단계로 꽂았습니다. 판정기 규칙을 대신하지 않고, 기존 로그인 동작(이메일·비밀번호 검증, 401/400/405/500 응답)은 그대로 보존합니다.
+**왜 `src/decider.mjs`(ZTNA 판정기)가 아니라 `api/auth/login.mjs`에 연결했는가**: 이 과제 시점(5단계)에 `AGENTS.md`는 "6단계부터 `src/decider.mjs`를 고칠 때는..."이라고 명시해, 지금 그 파일·`RULE_IDS`를 고치는 것 자체를 금지합니다. 그리고 그 전에 더 근본적인 문제가 있습니다 — `docs/DECIDER_REQUEST.md`가 정의한 요청 계약(18개 필드: `schema`, `requestId`, `classId`, `projectId`, `subjectId`, `deviceId`, `service`, `method`, `path`, `route`, `queryLength`, `querySha256`, `at`, `policyRevision`, `deviceRegistered`, `stepUp`, `recentEvents`, `signals`)에는 **출발 IP를 담는 필드가 아예 없습니다**(`signals.source`는 실제 경로에서 늘 `"none"`). 즉 6단계가 되어 `decider.mjs`를 고칠 수 있게 되더라도, 지금 계약으로는 `decide(request)` 안에서 IP 기반 차단을 구현할 길이 없습니다(계약에 없는 `request.sourceIp` 같은 필드를 임의로 만드는 것도 금지되어 있음). 또한 `decide()`는 `scripts/decider-test.mjs`·`scripts/fixture-7.mjs`·`scripts/bundle.mjs`(로컬 개발·빌드 스크립트)와 외부 반 엔진에서만 호출되고, 이 저장소의 `api/*.mjs` 어디에서도 호출되지 않습니다 — 이 앱의 실제 요청 처리에는 지금 작동하는 ZTNA 판정기가 없습니다. **로그인 가드(`src/xdr-login-guard.mjs`)는 판정기와 동등하거나 그걸 대신하는 것이 아닙니다** — 판정기가 구조적으로 볼 수 없는 신호(실제 IP)에 대해서만 작동하는, 로그인 경로 앞에 붙는 좁은 범위의 별도 부품입니다. 과제 자체의 "ZTNA 판정기가 없으면 기존 접근 제어에 연결" 조항이 이 상황(계약상 판정기가 이 신호를 다룰 수 없음)에 해당한다고 보고 이렇게 연결했습니다. 6단계 이후 계약에 관련 필드가 추가되면 판정기 쪽으로 옮기는 게 더 맞습니다.
+
+### 구현된 전체 경로
+
+`decide(alert)` → **로컬·격리된** 임시 거부 규칙(만료 시각·근거 경보 번호 포함, `xdr/brute-force/blocklist.json`) → `api/auth/login.mjs`가 로그인 시도 전에 `src/xdr-login-guard.mjs`로 거부 규칙을 조회해 403으로 거부. 이 전체가 **같은 코드**로 두 가지 저장소(시험용 격리 메모리 표 / 운영 Supabase 표)에 대해 동작합니다 — `src/xdr-login-guard.mjs`가 `store` 인터페이스(`{ isBlocked(sourceIp, nowMs) }`)를 받고, `createMemoryBlocklistStore`(격리된 시험용)와 `createSupabaseBlocklistStore`(운영 Supabase)가 그 인터페이스를 각각 구현합니다.
 
 - **경보 읽기** (`xdr/brute-force/read-alerts.mjs`): `xdr/fixtures/brute-force.json`(**합성 시험 자료**, 실제 Wazuh 배포에서 뽑은 게 아님)에서 시각·출발 주소·계정·규칙 수준·설명만 추출합니다. 근거 경보 번호(`id`)는 추출 결과와 분리해 내부 추적용으로만 돌려주고, 원본 경보 건수와 추출 건수가 다르면 예외를 던집니다.
 - **패턴** (`xdr/brute-force/patterns.json`): 같은 출발 주소·계정의 반복 실패(MITRE ATT&CK T1110.001), 그 애매한 구간, 같은 출발 주소의 여러 계정 대상 실패(비밀번호 추측 의심, MITRE ATT&CK T1110.003)를 패턴 이름·조건·근거 한 줄로 정리했습니다. 실패 로그만으로 "같은 비밀번호 사용"을 단정하지 않고 의심 신호로만 구분합니다.
-- **판단** (`xdr/brute-force/decide.mjs`): `decide(alert)`가 출발 주소별 시간 창(기본 10분) 집계를 관리하며 `{action, confidence, reason}`을 돌려줍니다. confidence ≥0.85 block, ≥0.5 alert, 그 아래 record. 애매한 구간만 `xdr/brute-force/jev-client.mjs`로 Jev에 확신도를 묻고, **이 저장소에는 실제 Jev 주소·키 정보가 없어** `JEV_ENDPOINT`/`JEV_API_KEY` 환경변수가 없으면 호출 자체를 하지 않고 바로 alert 기본값으로 떨어집니다(응답 실패·시간 초과·잘못된 응답도 동일). 실제 Jev 연동이 필요하면 그 주소·키를 Vercel/로컬 환경변수 화면에 직접 넣으세요(이 코드에는 적지 않습니다).
-- **차단 규칙 생성(로컬)** (`xdr/brute-force/block-rules.mjs`): block 판정만 만료 시각·근거 경보 번호가 붙은 임시 거부 규칙으로 바뀌어 `xdr/brute-force/blocklist.json`(`.gitignore` 대상, 로컬 파일)에 쌓입니다. 같은 출발 주소가 다시 block돼도 규칙이 중복 생성되지 않습니다(근거 번호만 합쳐짐). 알림(block·alert)은 비밀값 없이 `xdr/alerts.log`에 한 줄씩 쌓입니다(역시 `.gitignore` 대상).
-- **실제 로그인 요청 쪽 연결(읽기만)** (`src/xdr-login-guard.mjs`, `supabase/xdr_blocklist.local.sql`): Vercel의 상태 없는 서버 함수 사이에서도 차단이 유지되도록, 기존 Supabase DB에 새 표 `public.xdr_brute_force_blocklist`를 두고(로컬 전용 SQL, 학생이 직접 실행해야 적용됨) `api/auth/login.mjs`가 로그인 시도 전에 이 표를 조회해 403으로 거부합니다. 출발 IP는 `x-forwarded-for`의 **마지막 홉**(Vercel이 실제 연결 주소로 덧붙이는 값)만 신뢰합니다 — 첫 홉은 클라이언트가 임의로 써 보낼 수 있어 그 값으로 차단을 우회하거나 다른 사람 IP를 사칭하게 둘 수 없기 때문입니다. DB 조회가 실패하면 정상 로그인이 막히지 않도록 열어 둡니다(fail-open, 콘솔 오류만 남김).
-- **`xdr:run`과 이 표는 연결되어 있지 않습니다(의도적)**: `npm run xdr:run -- brute-force`는 **로컬 파일만** 만듭니다(`xdr/brute-force/blocklist.json`, `xdr/brute-force/result.json`) — Supabase `xdr_brute_force_blocklist` 표에는 아무것도 쓰지 않습니다. 합성 시험 경보(RFC 5737 문서용 주소)를 자동으로 운영 차단 표에 집어넣는 길을 일부러 만들지 않았습니다. 이렇게 하면 시험 자료가 실제 로그인을 검사하는 표에 섞여 들어갈 일이 없습니다. 지금 이 표는 **학생이 Supabase SQL Editor에서 직접 행을 넣고 지우는 수동 시험**으로만 채워집니다 — 아래 "배포 후 수동 검증 순서"를 따르세요.
-- **배포 후 수동 검증 순서**:
-  1. `supabase/xdr_blocklist.local.sql`을 검토 후 Supabase SQL Editor에서 한 번 실행합니다(표 생성, `anon`/`authenticated` 권한 회수).
-  2. 이 저장점을 배포합니다.
-  3. 본인이 지금 접속에 쓰는 실제 공개 IP를 확인합니다(브라우저에서 "내 IP 확인" 검색 등 — 이 코드나 저장소에는 적지 않습니다).
-  4. SQL Editor에서 **본인 IP**로, 짧은 만료 시각(예: 지금부터 2분)인 행을 하나만 넣습니다: `insert into public.xdr_brute_force_blocklist (source_ip, expires_at, basis_alert_ids, reason) values ('<본인 IP>', now() + interval '2 minutes', array['MANUAL-TEST'], 'manual guard test');`
-  5. 그 2분 안에 배포된 화면에서 로그인을 시도합니다 → **기대: 403** `{"error":"temporarily_blocked"}` (차단 대상 거부).
-  6. 2분 뒤(만료 후) 같은 계정으로 다시 로그인을 시도합니다 → **기대: 평소와 같은 결과**(비밀번호가 맞으면 200, 틀리면 401) — 차단이 풀렸는지 확인합니다(만료 후 해제).
-  7. (선택) 다른 네트워크/기기에서 로그인해 본인 IP가 차단된 동안에도 **무관한 주소는 통과**하는지 확인합니다.
-  8. 시험이 끝나면 `delete from public.xdr_brute_force_blocklist where reason = 'manual guard test';`로 시험 행을 지웁니다.
-  이 순서는 아직 **직접 실행해 확인하지 않았습니다** — 코드 근거(아래)로만 설계했고, 학생이 배포 후 직접 따라야 합니다.
-- **로컬 시험 재실행 방법**: `npm run xdr:run -- brute-force`로 합성 시험 경보를 돌려 `xdr/brute-force/result.json`(block·alert·record 건수, 정상 이벤트 오차단 건수, 차단 만료 검증, 무관 주소 통과 여부)을 갱신합니다. 이번 실행 결과: 전체 25건 중 **block 2·alert 9·record 14**, 정상 이벤트 오차단 **0건**, 만료 검증·무관 주소 통과 모두 **true**. 이 결과는 전부 로컬 파일 기준이며, 위 Supabase 표나 실제 배포와는 무관합니다.
-- **ZTNA 판정기(`src/decider.mjs`)에 연결하지 않은 이유**: `src/decider.mjs`의 `decide(request)`는 `scripts/decider-test.mjs`·`scripts/fixture-7.mjs`·`scripts/bundle.mjs`(모두 로컬 개발·빌드 스크립트)와 `docs/DECIDER_REQUEST.md`가 설명하는 외부 반 엔진에서만 호출되고, 이 저장소의 `api/*.mjs` 어디에서도 호출되지 않습니다 — 즉 이 앱의 실제 요청 처리에는 지금 작동하는 ZTNA 판정기가 없습니다. 게다가 `AGENTS.md`는 6단계 전(지금은 5단계)에 `decider.mjs`를 고치는 것과, 계약(`request.sourceIp` 같은 필드는 계약에 없음)에 없는 값 추가를 금지합니다. 그래서 과제의 "ZTNA 판정기가 없으면 기존 접근 제어에 추가 검사로 연결" 조항을 따라 이 앱에서 실제로 접근을 제어하는 `api/auth/login.mjs`에 연결했습니다. 6단계 이후 `decider.mjs`가 실제로 구현되고 계약에 관련 필드가 추가되면, 그때 이 판정을 판정기 쪽으로 옮기는 것이 더 맞습니다.
-- **아직 충족하지 못한 조건(정직하게 남김)**: (1) 실제 Wazuh 운영 경보 수집 파이프라인 없음(합성 fixture만). (2) 실제 Jev 엔드포인트 없음(미응답 경로만 시험됨, 애매한 경우는 전부 alert 기본값). (3) `xdr:run`의 block 결과가 Supabase 운영 표로 자동 연결되지 않음(의도적, 위 설명 참고). (4) 위 "배포 후 수동 검증 순서"는 설계만 했고 실제 배포에 대해 실행해 확인하지 않음. (5) `x-forwarded-for` 마지막 홉이 Vercel에서 실제로 신뢰할 수 있는지는 표준 관례로 구현했을 뿐, 실제 배포 요청으로 검증하지 않음. 이 중 무엇도 "운영 심판 판정"이나 "실제 공격 차단 증거"로 보고하지 않습니다 — `npm run xdr:run`은 합성 자료로 하는 로컬 학생 연습입니다.
+- **판단** (`xdr/brute-force/decide.mjs`): `decide(alert)`가 출발 주소별 시간 창(기본 10분) 집계를 관리하며 `{action, confidence, reason}`을 돌려줍니다. confidence ≥0.85 block, ≥0.5 alert, 그 아래 record. 애매한 구간만 `xdr/brute-force/jev-client.mjs`로 Jev에 확신도를 묻습니다.
+- **차단 규칙 생성** (`xdr/brute-force/block-rules.mjs`): block 판정만 만료 시각·근거 경보 번호가 붙은 임시 거부 규칙으로 바뀌어 저장됩니다. 같은 출발 주소가 다시 block돼도 규칙이 중복 생성되지 않습니다(근거 번호만 합쳐짐, 만료 시각은 더 늦은 쪽으로만 늘어남). 알림(block·alert)은 비밀값 없이 `xdr/alerts.log`에 한 줄씩 쌓입니다.
+- **요청 처리 쪽 연결** (`src/xdr-login-guard.mjs`): `api/auth/login.mjs`가 로그인 시도 전에 `isSourceBlocked({ store, sourceIp })`를 호출해 403으로 거부합니다. 조회가 실패하면 정상 로그인이 막히지 않도록 열어 둡니다(fail-open, 콘솔 오류만 남김). 운영 저장소는 Vercel의 상태 없는 서버 함수 사이에서도 차단이 유지되도록 기존 Supabase DB의 새 표 `public.xdr_brute_force_blocklist`(`supabase/xdr_blocklist.local.sql`, 로컬 전용 SQL, **학생이 직접 실행해야 적용됨**)를 씁니다.
+
+### 출발 IP를 어떤 헤더로, 왜 그렇게 신뢰하는가 (Vercel 공식 문서 확인함)
+
+[Vercel 공식 문서(Request headers, 2025-12-13 갱신)](https://vercel.com/docs/headers/request-headers)를 직접 확인했습니다. 이전 버전에서는 "클라이언트가 보낸 `x-forwarded-for`의 첫 홉은 위조 가능하니 마지막 홉만 신뢰한다"는 **일반적인 리버스 프록시 관례**로 구현했었는데, 이는 Vercel의 실제 동작과 달랐습니다. 문서의 정확한 문구:
+
+> `x-forwarded-for`: "The public IP address of the client that made the request... If you are trying to use Vercel behind a proxy, we currently **overwrite** the X-Forwarded-For header and **do not forward external IPs**. This restriction is in place to prevent IP spoofing."
+> `x-vercel-forwarded-for`: "identical to the x-forwarded-for header. However, x-forwarded-for **could be overwritten if you're using a proxy on top of Vercel**."
+> `x-real-ip`: "identical to the x-forwarded-for header."
+
+즉 기본값(Enterprise 전용 "Trusted Proxy" 기능을 쓰지 않는 한, 이 프로젝트는 안 씀)에서는 Vercel이 `x-forwarded-for`를 클라이언트가 보낸 값과 무관하게 실제 연결 IP로 **통째로 덮어씁니다** — 여러 홉이 이어진 체인이 아니라 단일 값입니다. 다만 Vercel **앞에 학생이 나중에 다른 프록시(예: Cloudflare)를 추가**하면 그 프록시가 `x-forwarded-for`를 다시 바꿀 수 있어, 그 경우에도 안 바뀌는 `x-vercel-forwarded-for`를 최우선으로 쓰도록 `extractSourceIp`를 고쳤습니다(우선순위: `x-vercel-forwarded-for` → `x-forwarded-for` → `x-real-ip`, 혹시 쉼표로 이어진 값이 오면 마지막 항목만 — 통상적인 단일 IP 상황에서는 결과가 같음). 이 우선순위 로직 자체는 `npm run xdr:run`의 전체 경로 시험(아래)에서 가짜 요청으로 확인했지만, **실제 Vercel 배포가 보내는 헤더 값을 가지고 검증한 것은 아닙니다** — 배포 후 로그로 직접 확인해 주세요.
+
+### 전체 경로를 격리된 저장소로 자동 시험 (`npm run xdr:run -- brute-force`)
+
+`xdr/brute-force/run.mjs`는 `src/xdr-login-guard.mjs`의 `createMemoryBlocklistStore`로 **이번 실행에서 decide()가 만든 블록 규칙만 담은, 운영 Supabase와 완전히 분리된 메모리 표**를 만들고, `api/auth/login.mjs`가 실제로 호출하는 **같은** `extractSourceIp`·`isSourceBlocked` 함수를 가짜 요청 헤더로 호출합니다. 즉 DB에 수동으로 넣는 시험이 아니라, 로그인 경로가 쓰는 코드 자체를 자동으로 왕복시킵니다. 이번 실행 결과(`xdr/brute-force/result.json`):
+
+- 탐지: 전체 25건 중 **block 2 · alert 9 · record 14**, 정상 이벤트 오차단 **0건**.
+- 전체 경로 시험 6건 모두 통과: 명확한 공격 요청 거부, 애매한 시도는 차단하지 않음, 정상 이벤트 주소는 통과, 전혀 무관한 주소는 통과, **만료 이후에는 같은 주소도 통과**, 위조 가능한 `x-forwarded-for`보다 `x-vercel-forwarded-for`를 우선함.
+
+이 결과는 전부 로컬·격리된 저장소 기준이며, 운영 Supabase 표나 실제 배포 요청을 쓰지 않았습니다 — 실제 DB 왕복은 아래 `xdr:sync`가 따로 담당합니다.
+
+### 운영 DB 동기화는 명시적으로 분리된 별도 명령 (`npm run xdr:sync -- brute-force`)
+
+`xdr:run`은 Supabase에 **절대** 쓰지 않습니다(의도적 — 합성 시험 자료가 운영 차단 표에 자동으로 섞여 들어가는 걸 막기 위함). 운영 DB에 손대는 건 오직 `xdr/brute-force/sync.mjs` 하나이며, 플래그 없이는 아무것도 쓰지 않습니다.
+
+- `npm run xdr:sync -- brute-force` (플래그 없음): **미리보기만**. 로컬 `blocklist.json`의 만료되지 않은 항목을 보여주기만 하고 DB에 쓰지 않습니다. (SUPABASE_URL/SUPABASE_SECRET_KEY가 없는 이 세션에서 실행해 확인함 — 안전하게 "환경변수 없음" 안내만 출력됨.)
+- `npm run xdr:sync -- brute-force --probe`: **실제 DB 왕복 자체 점검**. 표시용 행 1개(RFC 5737 문서용 주소, 실사용자와 안 겹침)를 운영 표에 넣고 → `src/xdr-login-guard.mjs`의 실제 운영 저장소(`createSupabaseBlocklistStore`)로 조회해 맞게 읽히는지 확인하고 → 그 행을 지웁니다. 끝나면 운영 표에 아무것도 남지 않습니다. **이 세션에는 실제 Supabase 자격 정보가 없어 이 모드를 실행해 확인하지 못했습니다** — 학생이 자신의 `SUPABASE_URL`/`SUPABASE_SECRET_KEY`를 로컬 환경변수에 넣고 직접 실행해야 합니다(이 코드나 대화에는 그 값을 적지 않음).
+- `npm run xdr:sync -- brute-force --confirm`: 로컬 `blocklist.json`의 만료되지 않은 항목을 실제로 운영 표에 올립니다. 지금은 합성 fixture만 있어 RFC 5737 주소가 올라가므로, 평소에는 `--probe`만 쓰는 걸 권장합니다.
+
+### Jev: 이 저장소에 있는 것과 실제로 필요한 것
+
+이 저장소·`AGENTS.md`·`docs/` 어디에도 "Jev"의 실제 엔드포인트·인증 방식·요청/응답 스키마가 정의되어 있지 않고, `node_modules`·`package-lock.json`에도 관련 패키지가 없습니다(직접 검색해 확인함) — 즉 Jev는 이 스타터 킷에는 존재하지 않는, 과제 설명에만 나오는 외부 서비스입니다. `xdr/brute-force/jev-client.mjs`는 **제가 임의로 가정한 모양**(POST, JSON 본문, `Authorization: Bearer <JEV_API_KEY>`, 응답 `{confidence: 0~1}`)의 자리만 만들어 뒀고, `JEV_ENDPOINT`/`JEV_API_KEY` 환경변수가 없으면 호출 자체를 하지 않고 바로 alert 기본값으로 떨어집니다(응답 실패·시간 초과·잘못된 응답도 동일). **실제 연동에 필요한 것**: (1) 운영 측이 제공하는 실제 Jev 엔드포인트 URL과 (2) 인증 키 — 이 둘은 과제 자료 어디에도 없으므로 먼저 확인이 필요하고, (3) 제가 가정한 요청/응답 모양이 실제 Jev 스펙과 다를 수 있으므로 실제 스펙을 받으면 `jev-client.mjs`의 요청 구성·응답 파싱을 그 스펙에 맞게 다시 고쳐야 합니다. 이번에 검증한 것은 전부 "Jev가 없을 때의 기본값 경로"(alert로 떨어짐)이며, 실제 Jev 응답을 받아 확신도를 반영하는 경로는 전혀 실행해 보지 못했습니다.
+
+### 아직 충족하지 못한 조건 (정직하게 남김)
+
+1. 실제 Wazuh 운영 경보 수집 파이프라인 없음(합성 fixture만).
+2. 실제 Jev 엔드포인트·키 없음(미응답 경로만 시험됨, 위 "Jev" 절 참고).
+3. `npm run xdr:sync -- brute-force --probe`/`--confirm`을 실제 Supabase 자격 정보로 실행해 확인한 적 없음(코드는 작성·구문 검사만 했음, 이 세션에는 자격 정보가 없음).
+4. 위에서 설계한 전체 경로는 격리된 메모리 저장소로는 자동 검증됐지만, **실제 배포된 Vercel 함수 + 실제 Supabase 표**로의 왕복은 아직 실행해 확인하지 않았습니다.
+5. `x-vercel-forwarded-for` 우선순위 로직이 실제 Vercel 요청에서 기대한 값을 주는지는 아직 실제 배포 로그로 확인하지 않았습니다(공식 문서 문구 기준으로만 구현).
+
+이 중 무엇도 "운영 심판 판정"이나 "실제 공격 차단 증거"로 보고하지 않습니다 — `npm run xdr:run`은 격리된 저장소로 하는 로컬 학생 연습이고, `npm run xdr:sync`는 실제 DB에 닿는 별도의 명시적 명령입니다.
 
 ## 시작 틀의 자동 처리
 

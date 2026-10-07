@@ -1,13 +1,19 @@
 // npm run xdr:run -- brute-force 로 실행합니다.
 // xdr/fixtures/brute-force.json(합성 시험 경보)을 읽어 decide()로 판단하고,
 // block만 임시 거부 규칙으로 올리고, 알림은 xdr/alerts.log에 남기고,
-// xdr/brute-force/result.json에 counts와 정상 이벤트 오차단 여부를 기록합니다.
+// xdr/brute-force/result.json에 counts·정상 이벤트 오차단 여부·연결된 경로
+// 전체의 거부/통과/만료 시험 결과를 기록합니다.
+//
+// 이 실행은 전부 로컬·격리된 저장소에서만 일어납니다(Supabase를 전혀
+// 건드리지 않음) — 운영 DB 동기화는 별도 명령 npm run xdr:sync로 분리되어
+// 있습니다(xdr/brute-force/sync.mjs).
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readAlerts } from './read-alerts.mjs';
 import { decide, resetDecideState } from './decide.mjs';
-import { loadBlocklist, saveBlocklist, upsertBlock, isBlocked, pruneExpired } from './block-rules.mjs';
+import { loadBlocklist, saveBlocklist, upsertBlock, pruneExpired } from './block-rules.mjs';
+import { createMemoryBlocklistStore, extractSourceIp, isSourceBlocked } from '../../src/xdr-login-guard.mjs';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(moduleDir, '..', '..');
@@ -17,6 +23,42 @@ const blocklistPath = resolve(moduleDir, 'blocklist.json');
 const resultPath = resolve(moduleDir, 'result.json');
 const logPath = resolve(root, 'xdr', 'alerts.log');
 const { config } = JSON.parse(readFileSync(resolve(moduleDir, 'patterns.json'), 'utf8'));
+
+function fakeRequest(headers) {
+  return { headers };
+}
+
+// api/auth/login.mjs가 실제로 호출하는 extractSourceIp·isSourceBlocked를
+// 그대로 호출해 전체 경로(헤더 추출 → 저장소 조회 → 허용/거부)를 시험합니다.
+// 저장소만 격리된 메모리 표(decide()가 이번 실행에서 만든 블록 규칙)로
+// 바꿔 끼웁니다 — 실제 Supabase는 전혀 호출하지 않습니다.
+async function runEndToEndChecks({ blocklist, attackIp, ambiguousIp, benignIp, unrelatedIp, nowMs, expiredCheckMs }) {
+  const rows = blocklist.map((entry) => ({ source_ip: entry.sourceIp, expires_at: new Date(entry.expiresAtMs).toISOString() }));
+  const store = createMemoryBlocklistStore(rows);
+
+  const checks = [];
+  const check = async (name, headers, nowForCheck, expectedBlocked) => {
+    const sourceIp = extractSourceIp(fakeRequest(headers));
+    const blocked = await isSourceBlocked({ store, sourceIp, nowMs: nowForCheck });
+    checks.push({ name, sourceIp, expectedBlocked, actualBlocked: blocked, passed: blocked === expectedBlocked });
+  };
+
+  await check('명확한 공격 요청 거부', { 'x-vercel-forwarded-for': attackIp }, nowMs, true);
+  await check('애매한 시도는 차단하지 않음', { 'x-vercel-forwarded-for': ambiguousIp }, nowMs, false);
+  await check('정상 이벤트 주소는 통과', { 'x-vercel-forwarded-for': benignIp }, nowMs, false);
+  await check('전혀 무관한 주소는 통과', { 'x-vercel-forwarded-for': unrelatedIp }, nowMs, false);
+  await check('만료 이후에는 같은 주소도 통과', { 'x-vercel-forwarded-for': attackIp }, expiredCheckMs, false);
+  // x-forwarded-for에 다른 값이 섞여 있어도 x-vercel-forwarded-for(추가 프록시가 있어도
+  // 바뀌지 않는 값)를 우선해야 합니다 — 위조 시도 상황을 흉내냅니다.
+  await check(
+    '위조 가능한 x-forwarded-for보다 x-vercel-forwarded-for를 우선함',
+    { 'x-forwarded-for': '198.51.100.250', 'x-vercel-forwarded-for': attackIp },
+    nowMs,
+    true,
+  );
+
+  return checks;
+}
 
 export async function run() {
   mkdirSync(resolve(root, 'xdr'), { recursive: true });
@@ -30,6 +72,9 @@ export async function run() {
   const expectedRaw = JSON.parse(readFileSync(expectedPath, 'utf8'));
   const expectedByAlertId = expectedRaw.byAlertId ?? {};
 
+  // 격리된 시험 저장소: 이번 실행 동안만 쓰는 로컬 블록리스트입니다. 운영
+  // Supabase 표와는 완전히 분리되어 있고, 이 함수 안에서는 네트워크 호출이
+  // 전혀 일어나지 않습니다.
   let blocklist = loadBlocklist(blocklistPath);
   const nowRunMs = Date.now();
   blocklist = pruneExpired(blocklist, nowRunMs);
@@ -66,18 +111,19 @@ export async function run() {
 
   saveBlocklist(blocklistPath, blocklist);
 
-  // 차단 만료 자체 검증: 방금 만든 규칙 중 하나를 만료 이후 시각으로 다시 확인합니다.
-  let expiryVerified = null;
-  const sampleBlockedIp = blocklist[0]?.sourceIp ?? null;
-  if (sampleBlockedIp) {
-    const entry = blocklist.find((item) => item.sourceIp === sampleBlockedIp);
-    const stillBlockedNow = isBlocked(blocklist, sampleBlockedIp, entry.expiresAtMs - 1);
-    const blockedAfterExpiry = isBlocked(blocklist, sampleBlockedIp, entry.expiresAtMs + 1000);
-    expiryVerified = stillBlockedNow === true && blockedAfterExpiry === false;
-  }
-
-  // 정상 요청 통과 자체 검증: 공격자 주소와 전혀 다른 주소는 차단되지 않아야 합니다.
-  const unrelatedIpPassed = !isBlocked(blocklist, '203.0.113.254', nowRunMs);
+  const attackEntry = blocklist.find((entry) => entry.sourceIp === '203.0.113.10');
+  const endToEndChecks = attackEntry
+    ? await runEndToEndChecks({
+      blocklist,
+      attackIp: '203.0.113.10',
+      ambiguousIp: '198.51.100.22',
+      benignIp: '203.0.113.99',
+      unrelatedIp: '203.0.113.254',
+      nowMs: attackEntry.expiresAtMs - 1,
+      expiredCheckMs: attackEntry.expiresAtMs + 1000,
+    })
+    : [];
+  const endToEndFailures = endToEndChecks.filter((item) => !item.passed);
 
   const result = {
     schema: 'xdr.brute-force.result.v1',
@@ -92,18 +138,21 @@ export async function run() {
       expiresAt: new Date(entry.expiresAtMs).toISOString(),
       basisAlertIds: entry.basisAlertIds,
     })),
-    expiryVerified,
-    unrelatedIpPassed,
-    note: '합성 시험 경보 기준 결과입니다. 실제 Wazuh 운영 경보·Jev 연동 결과가 아닙니다.',
+    endToEndChecks,
+    endToEndAllPassed: endToEndChecks.length > 0 && endToEndFailures.length === 0,
+    note: '합성 시험 경보 기준 결과이며, api/auth/login.mjs가 실제로 쓰는 src/xdr-login-guard.mjs 함수를 격리된 메모리 저장소로 호출해 전체 경로(헤더 추출→저장소 조회→허용/거부)를 시험합니다. 실제 Supabase·Wazuh 운영 경보·Jev 연동 결과가 아닙니다.',
   };
 
   writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8', flag: 'w' });
 
   process.stdout.write(
-    `xdr brute-force 실행 완료 · 전체 ${originalCount}건 · block ${counts.block} · alert ${counts.alert} · record ${counts.record} · 정상 이벤트 오차단 ${falsePositives.length}건 · 만료 검증 ${expiryVerified} · 무관 주소 통과 ${unrelatedIpPassed}\n`,
+    `xdr brute-force 실행 완료 · 전체 ${originalCount}건 · block ${counts.block} · alert ${counts.alert} · record ${counts.record} · 정상 이벤트 오차단 ${falsePositives.length}건 · 전체 경로 시험 ${endToEndChecks.length}건 중 통과 ${endToEndChecks.length - endToEndFailures.length}건\n`,
   );
+  for (const item of endToEndChecks) {
+    process.stdout.write(`  ${item.passed ? '통과' : '실패'} · ${item.name} (sourceIp=${item.sourceIp}, 기대=${item.expectedBlocked}, 실제=${item.actualBlocked})\n`);
+  }
 
-  if (falsePositives.length > 0) {
+  if (falsePositives.length > 0 || endToEndFailures.length > 0) {
     process.exitCode = 1;
   }
   return result;
