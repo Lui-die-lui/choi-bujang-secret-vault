@@ -1,6 +1,6 @@
 {
   "schema": "xdr.brute-force.result.v1",
-  "generatedAt": "2026-10-07T11:00:11.948Z",
+  "generatedAt": "2026-10-07T11:22:41.332Z",
   "totalAlerts": 25,
   "counts": {
     "block": 17,

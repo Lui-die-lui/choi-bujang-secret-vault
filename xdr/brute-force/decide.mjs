@@ -28,7 +28,8 @@ function pruneWindow(entries, nowMs) {
 // 판단됩니다.
 export function primeWindow(records) {
   windowBySourceIp.clear();
-  for (const record of records) {
+  for (const raw of records) {
+    const record = normalizeAlert(raw);
     const list = windowBySourceIp.get(record.sourceIp) ?? [];
     list.push({ timeMs: Date.parse(record.time), account: record.account });
     windowBySourceIp.set(record.sourceIp, list);
@@ -38,6 +39,25 @@ export function primeWindow(records) {
 
 function clampConfidence(value) {
   return Math.max(0, Math.min(1, value));
+}
+
+// decide(alert)가 read-alerts.mjs가 뽑은 { time, sourceIp, account, ... } 형식뿐
+// 아니라, xdr/fixtures/brute-force.json 그대로의 원본 Wazuh 모양
+// ({ timestamp, rule: {level, description}, data: {srcip, srcuser} })으로
+// 직접 불려도 올바르게 읽히도록 둘 다 받습니다. 둘 중 어느 쪽도 아니면(필드가
+// 비어 있으면) 판단 불가로 보고 record로 떨어지되, sourceIp 없이도 안 터지게
+// 비어있지 않은 기본값을 둡니다.
+function normalizeAlert(alert) {
+  if (alert && typeof alert.time === 'string' && typeof alert.sourceIp === 'string') {
+    return alert;
+  }
+  return {
+    time: alert?.timestamp,
+    sourceIp: alert?.data?.srcip,
+    account: alert?.data?.srcuser,
+    ruleLevel: alert?.rule?.level,
+    description: alert?.rule?.description,
+  };
 }
 
 function actionForConfidence(confidence) {
@@ -50,7 +70,8 @@ function actionForConfidence(confidence) {
 // 같은 출발 주소·같은 계정만 반복해서 겨냥하는 실패는(여러 계정을 흩어서 노리는
 // spray와 달리) 대상이 하나로 명확해 애매할 이유가 없으므로, 문턱을 넘으면 Jev를
 // 거치지 않고 바로 block으로 판단합니다. 애매함은 "여러 계정 대상"에만 적용됩니다.
-export async function decide(alert) {
+export async function decide(rawAlert) {
+  const alert = normalizeAlert(rawAlert);
   const nowMs = Date.parse(alert.time);
   let entries = windowBySourceIp.get(alert.sourceIp) ?? [];
   if (!primed) {
