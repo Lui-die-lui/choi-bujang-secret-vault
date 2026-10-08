@@ -1,31 +1,49 @@
 {
   "schema": "xdr.brute-force.result.v1",
-  "generatedAt": "2026-10-08T05:59:28.013Z",
-  "totalAlerts": 25,
+  "generatedAt": "2026-10-08T06:22:37.881Z",
+  "totalAlerts": 10,
   "counts": {
-    "block": 11,
-    "alert": 11,
-    "record": 3
+    "block": 5,
+    "alert": 3,
+    "record": 2
   },
   "falsePositiveCount": 0,
   "falsePositiveAlertIds": [],
-  "blockRuleCount": 1,
+  "blockRuleCount": 5,
   "blockRules": [
     {
       "sourceIp": "203.0.113.10",
-      "expiresAt": "2026-10-07T02:06:40.000Z",
+      "expiresAt": "2026-10-07T02:00:00.000Z",
       "basisAlertIds": [
-        "ALERT-0001",
-        "ALERT-0002",
-        "ALERT-0003",
-        "ALERT-0004",
-        "ALERT-0005",
-        "ALERT-0006",
-        "ALERT-0007",
-        "ALERT-0008",
-        "ALERT-0009",
-        "ALERT-0010",
-        "ALERT-0011"
+        "ALERT-0001"
+      ]
+    },
+    {
+      "sourceIp": "203.0.113.11",
+      "expiresAt": "2026-10-07T02:05:00.000Z",
+      "basisAlertIds": [
+        "ALERT-0002"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.20",
+      "expiresAt": "2026-10-07T02:10:00.000Z",
+      "basisAlertIds": [
+        "ALERT-0003"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.21",
+      "expiresAt": "2026-10-07T02:15:00.000Z",
+      "basisAlertIds": [
+        "ALERT-0004"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.22",
+      "expiresAt": "2026-10-07T02:20:00.000Z",
+      "basisAlertIds": [
+        "ALERT-0005"
       ]
     }
   ],

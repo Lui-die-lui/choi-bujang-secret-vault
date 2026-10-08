@@ -22,7 +22,10 @@ const expectedPath = resolve(root, 'xdr', 'fixtures', 'brute-force.expected.json
 const blocklistPath = resolve(moduleDir, 'blocklist.json');
 const resultPath = resolve(moduleDir, 'result.json');
 const logPath = resolve(root, 'xdr', 'alerts.log');
-const { config } = JSON.parse(readFileSync(resolve(moduleDir, 'patterns.json'), 'utf8'));
+// decide.mjs는 이제 import 없는 단일 파일이라 patterns.json을 안 읽습니다.
+// 차단 규칙의 만료 시각은 이 오프라인 시험 스크립트(run.mjs)에서만 쓰는
+// 값이라 여기 직접 둡니다 — decide.mjs의 BLOCK_AT 등 판단 기준과는 무관합니다.
+const BLOCK_DURATION_SECONDS = 3600;
 
 function fakeRequest(headers) {
   return { headers };
@@ -101,7 +104,7 @@ export async function run() {
     }
 
     if (outcome.action === 'block') {
-      const expiresAtMs = Date.parse(record.time) + config.blockDurationSeconds * 1000;
+      const expiresAtMs = Date.parse(record.time) + BLOCK_DURATION_SECONDS * 1000;
       upsertBlock(blocklist, { sourceIp: record.sourceIp, expiresAtMs, basisAlertId: alertId, reason: outcome.reason });
     }
 

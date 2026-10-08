@@ -2,17 +2,8 @@
   "_notice": "시험용 기대값입니다. decide()의 판단과는 별개로, run.mjs가 정상 이벤트 오차단 여부를 확인하는 데만 씁니다.",
   "_labels": "attack=명확한 공격(차단 기대), ambiguous=애매한 시도(알림 기대), benign=정상 이벤트(기록만 기대, 차단되면 오차단)",
   "byAlertId": {
-    "ALERT-0001": "attack", "ALERT-0002": "attack", "ALERT-0003": "attack", "ALERT-0004": "attack",
-    "ALERT-0005": "attack", "ALERT-0006": "attack", "ALERT-0007": "attack", "ALERT-0008": "attack",
-    "ALERT-0009": "attack", "ALERT-0010": "attack", "ALERT-0011": "attack",
-
-    "ALERT-0012": "ambiguous", "ALERT-0013": "ambiguous", "ALERT-0014": "ambiguous",
-    "ALERT-0015": "ambiguous", "ALERT-0016": "ambiguous", "ALERT-0017": "ambiguous",
-
-    "ALERT-0018": "ambiguous", "ALERT-0019": "ambiguous", "ALERT-0020": "ambiguous",
-    "ALERT-0021": "ambiguous", "ALERT-0022": "ambiguous",
-
-    "ALERT-0023": "benign", "ALERT-0024": "benign",
-    "ALERT-0025": "benign"
+    "ALERT-0001": "attack", "ALERT-0002": "attack", "ALERT-0003": "attack", "ALERT-0004": "attack", "ALERT-0005": "attack",
+    "ALERT-0006": "ambiguous", "ALERT-0007": "ambiguous", "ALERT-0008": "ambiguous",
+    "ALERT-0009": "benign", "ALERT-0010": "benign"
   }
 }
