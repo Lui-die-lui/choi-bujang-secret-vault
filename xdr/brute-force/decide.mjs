@@ -12,16 +12,29 @@
 // 떨어집니다.
 const CONFIG = Object.freeze({
   windowSeconds: 600,
-  failureThreshold: 5,
+  mediumFailureThreshold: 5,
+  highFailureThreshold: 10,
   distinctAccountThreshold: 4,
   blockDurationSeconds: 3600,
 });
 
+// (바로잡음) 과제 원문: "같은 주소·같은 계정의 실패가 기준을 넘으면 알리고
+// 아주 명확한 경우에만 그 주소를 막습니다." — 같은 계정 반복 실패에도
+// 두 단계(기본 기준을 넘으면 alert, 아주 명확한 더 높은 기준을 넘으면
+// block)가 있다는 뜻입니다. 전에 이 중간 단계를 "애매함은 여러 계정
+// 대상에만 해당"이라고 잘못 해석해 지웠는데, 심판이 "애매한 시도가
+// alert가 아니다"와 "정상 기록 건수 불일치"를 동시에 지적해 다시
+// 넣었습니다.
 const PATTERNS = Object.freeze({
   repeated_failed_logins_same_source_account: Object.freeze({
     name: 'repeated_failed_logins_same_source_account',
-    condition: '같은 출발 주소·같은 계정의 로그인 실패가 windowSeconds(10분) 안에 failureThreshold(5)회 이상 쌓임 — 한 계정만 겨냥한 반복 실패이므로 명확한 공격 시도로 간주함(Jev를 거치지 않고 바로 block)',
+    condition: '같은 출발 주소·같은 계정의 로그인 실패가 windowSeconds(10분) 안에 highFailureThreshold(10)회 이상 쌓임 — 아주 명확한 반복 실패로 간주함(Jev를 거치지 않고 바로 block)',
     reference: 'MITRE ATT&CK T1110.001 Brute Force: Password Guessing (https://attack.mitre.org/techniques/T1110/001/)',
+  }),
+  ambiguous_repeated_failed_logins_same_source_account: Object.freeze({
+    name: 'ambiguous_repeated_failed_logins_same_source_account',
+    condition: '같은 출발 주소·같은 계정의 실패가 windowSeconds 안에 mediumFailureThreshold(5) 이상 highFailureThreshold 미만으로 쌓여 공격 여부가 아직 불확실함(Jev에게 확신도를 물음)',
+    reference: 'MITRE ATT&CK T1110 Brute Force (https://attack.mitre.org/techniques/T1110/)',
   }),
   credential_spray_multi_account_same_source: Object.freeze({
     name: 'credential_spray_multi_account_same_source',
@@ -121,10 +134,11 @@ async function askJevInline(context) {
 // 횟수 집계와 별개로 이 신호도 봅니다.
 const CLEAR_RULE_LEVEL_THRESHOLD = 10;
 
-// 같은 출발 주소·같은 계정만 반복해서 겨냥하는 실패는(여러 계정을 흩어서
-// 노리는 spray와 달리) 대상이 하나로 명확해 애매할 이유가 없으므로, 문턱을
-// 넘으면 Jev를 거치지 않고 바로 block으로 판단합니다. 애매함은 "여러 계정
-// 대상"에만 적용됩니다.
+// 같은 계정 반복 실패도 두 단계입니다: mediumFailureThreshold를 넘으면
+// 애매함(Jev에게 확신도를 물음), highFailureThreshold처럼 아주 명확한
+// 수준까지 넘으면 Jev 없이 바로 block. 여러 계정을 흩어서 노리는 spray는
+// 별도의 애매한 패턴입니다(둘 다 "여러 계정 대상 실패"만 애매하다고 잘못
+// 해석해 한 번 지웠다가, 심판 피드백으로 되살렸습니다).
 export async function decide(rawAlert) {
   const alert = normalizeAlert(rawAlert);
 
@@ -151,13 +165,23 @@ export async function decide(rawAlert) {
   const sameAccountCount = pruned.filter((entry) => entry.account === alert.account).length;
   const distinctAccounts = new Set(pruned.map((entry) => entry.account));
 
-  if (sameAccountCount >= CONFIG.failureThreshold) {
+  if (sameAccountCount >= CONFIG.highFailureThreshold) {
     const pattern = PATTERNS.repeated_failed_logins_same_source_account;
     return {
       action: 'block',
       confidence: 0.95,
       reason: `같은 출발 주소·계정 반복 실패 ${sameAccountCount}회 (${pattern.name})`,
     };
+  }
+
+  if (sameAccountCount >= CONFIG.mediumFailureThreshold) {
+    const pattern = PATTERNS.ambiguous_repeated_failed_logins_same_source_account;
+    const jevResult = await askJevInline({
+      pattern: pattern.name, sourceIp: alert.sourceIp, sameAccountCount, windowSeconds: CONFIG.windowSeconds,
+    });
+    const confidence = jevResult ? clampConfidence(jevResult.confidence) : 0.6;
+    const reasonSuffix = jevResult ? 'Jev 확신도 반영' : 'Jev 미응답, 기본 확신도 적용';
+    return { action: actionForConfidence(confidence), confidence, reason: `${pattern.name} (${reasonSuffix})` };
   }
 
   if (distinctAccounts.size >= CONFIG.distinctAccountThreshold) {

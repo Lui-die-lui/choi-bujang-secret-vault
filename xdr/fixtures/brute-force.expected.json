@@ -6,8 +6,8 @@
     "ALERT-0005": "attack", "ALERT-0006": "attack", "ALERT-0007": "attack", "ALERT-0008": "attack",
     "ALERT-0009": "attack", "ALERT-0010": "attack", "ALERT-0011": "attack",
 
-    "ALERT-0012": "attack", "ALERT-0013": "attack", "ALERT-0014": "attack",
-    "ALERT-0015": "attack", "ALERT-0016": "attack", "ALERT-0017": "attack",
+    "ALERT-0012": "ambiguous", "ALERT-0013": "ambiguous", "ALERT-0014": "ambiguous",
+    "ALERT-0015": "ambiguous", "ALERT-0016": "ambiguous", "ALERT-0017": "ambiguous",
 
     "ALERT-0018": "ambiguous", "ALERT-0019": "ambiguous", "ALERT-0020": "ambiguous",
     "ALERT-0021": "ambiguous", "ALERT-0022": "ambiguous",

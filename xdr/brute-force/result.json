@@ -1,15 +1,15 @@
 {
   "schema": "xdr.brute-force.result.v1",
-  "generatedAt": "2026-10-08T05:41:45.618Z",
+  "generatedAt": "2026-10-08T05:59:28.013Z",
   "totalAlerts": 25,
   "counts": {
-    "block": 17,
-    "alert": 5,
+    "block": 11,
+    "alert": 11,
     "record": 3
   },
   "falsePositiveCount": 0,
   "falsePositiveAlertIds": [],
-  "blockRuleCount": 2,
+  "blockRuleCount": 1,
   "blockRules": [
     {
       "sourceIp": "203.0.113.10",
@@ -26,18 +26,6 @@
         "ALERT-0009",
         "ALERT-0010",
         "ALERT-0011"
-      ]
-    },
-    {
-      "sourceIp": "198.51.100.22",
-      "expiresAt": "2026-10-07T03:07:30.000Z",
-      "basisAlertIds": [
-        "ALERT-0012",
-        "ALERT-0013",
-        "ALERT-0014",
-        "ALERT-0015",
-        "ALERT-0016",
-        "ALERT-0017"
       ]
     }
   ],
