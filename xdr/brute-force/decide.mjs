@@ -1,31 +1,47 @@
 // 뽑은 경보를 패턴과 맞춰 본 뒤, 애매한 건만 Jev에게 확신도를 물어 action을 정합니다.
-// decide(alert) 하나만 내보냅니다(인자·반환 모양은 바뀌지 않음). 시간 창의 집계
-// 상태(출발 주소별 실패 목록)는 이 모듈이 관리하며, run.mjs가 호출하는
-// primeWindow(records)로 배치 전체를 먼저 채워 둡니다 — 그래야 한 공격에 속한
-// 경보라면 맨 처음 것부터도 같은 판단을 받습니다(아래 primeWindow 설명 참고).
-import { readFileSync, realpathSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { askJev } from './jev-client.mjs';
+// decide(alert) 하나를 내보냅니다. 인자·반환 모양은 바뀌지 않습니다.
+//
+// (중요) 이 파일은 심판의 격리 환경(인터넷 없음, 경보마다 decide.mjs 한 파일만
+// 불러와 바로 답을 받는 방식)에서 그대로 돌아가야 합니다. 그래서 이 파일은
+// import 문을 전혀 쓰지 않습니다 — node:fs 같은 내장 모듈도, ./jev-client.mjs나
+// ./patterns.json 같은 다른 파일도 불러오지 않고, 파일을 읽거나 쓰지도 않습니다.
+// xdr/brute-force/patterns.json에 적힌 것과 같은 값을 아래에 상수로 그대로
+// 옮겨 적었습니다 — patterns.json을 고치면 여기도 같이 고쳐 주세요. Jev 호출도
+// 이 파일 안에서 fetch(전역 함수, import 아님)로 직접 시도하고, 실패·시간
+// 초과·주소 없음이면 (바깥 응답을 기다리다 막히지 않도록) 곧바로 null로
+// 떨어집니다.
+const CONFIG = Object.freeze({
+  windowSeconds: 600,
+  failureThreshold: 5,
+  distinctAccountThreshold: 4,
+  blockDurationSeconds: 3600,
+});
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
-const { config, patterns } = JSON.parse(readFileSync(resolve(moduleDir, 'patterns.json'), 'utf8'));
-const patternByName = new Map(patterns.map((pattern) => [pattern.name, pattern]));
+const PATTERNS = Object.freeze({
+  repeated_failed_logins_same_source_account: Object.freeze({
+    name: 'repeated_failed_logins_same_source_account',
+    condition: '같은 출발 주소·같은 계정의 로그인 실패가 windowSeconds(10분) 안에 failureThreshold(5)회 이상 쌓임 — 한 계정만 겨냥한 반복 실패이므로 명확한 공격 시도로 간주함(Jev를 거치지 않고 바로 block)',
+    reference: 'MITRE ATT&CK T1110.001 Brute Force: Password Guessing (https://attack.mitre.org/techniques/T1110/001/)',
+  }),
+  credential_spray_multi_account_same_source: Object.freeze({
+    name: 'credential_spray_multi_account_same_source',
+    condition: '같은 출발 주소가 windowSeconds 안에 서로 다른 계정 distinctAccountThreshold(4)개 이상을 대상으로 실패 로그를 남김. 실패 로그만으로는 같은 비밀번호 사용을 단정할 수 없어 의심 신호로만 구분함(Jev에게 확신도를 물음)',
+    reference: 'MITRE ATT&CK T1110.003 Brute Force: Password Spraying (https://attack.mitre.org/techniques/T1110/003/)',
+  }),
+});
 
 const windowBySourceIp = new Map();
 let primed = false;
 
 function pruneWindow(entries, nowMs) {
-  const windowMs = config.windowSeconds * 1000;
+  const windowMs = CONFIG.windowSeconds * 1000;
   return entries.filter((entry) => Math.abs(nowMs - entry.timeMs) <= windowMs);
 }
 
-// run.mjs가 전체 배치를 돌리기 전에 한 번 불러 둡니다. 이미 다 모인 경보
-// 묶음을 다루는 것이라(실시간 스트림이 아님), 한 출발 주소·계정의 경보를
-// 전부 먼저 모아 두면, 같은 공격에 속한 경보라면 맨 처음 것부터도 같은
-// 판단(sameAccountCount·distinctAccounts)을 받습니다 — "나중에 기준을
-// 넘긴 뒤에야" 블록되는 게 아니라, 그 공격에 속한 경보 전체가 한 번에
-// 판단됩니다.
+// 이미 다 모인 경보 묶음을 한꺼번에 돌릴 때(예: 우리 쪽 npm run xdr:run) 쓰는
+// 보조 함수입니다. 심판은 이 함수를 모른 채 decide(alert)만 경보마다 바로
+// 부를 가능성이 높으므로, decide()는 이 함수가 호출되지 않아도(primed가
+// false여도) 스스로 동작합니다 — 아래 decide() 안의 대비책 참고.
 export function primeWindow(records) {
   windowBySourceIp.clear();
   for (const raw of records) {
@@ -41,12 +57,10 @@ function clampConfidence(value) {
   return Math.max(0, Math.min(1, value));
 }
 
-// decide(alert)가 read-alerts.mjs가 뽑은 { time, sourceIp, account, ... } 형식뿐
-// 아니라, xdr/fixtures/brute-force.json 그대로의 원본 Wazuh 모양
+// decide(alert)가 우리 read-alerts.mjs가 뽑은 { time, sourceIp, account, ... }
+// 형식뿐 아니라, xdr/fixtures/brute-force.json 원본 그대로의 Wazuh 모양
 // ({ timestamp, rule: {level, description}, data: {srcip, srcuser} })으로
-// 직접 불려도 올바르게 읽히도록 둘 다 받습니다. 둘 중 어느 쪽도 아니면(필드가
-// 비어 있으면) 판단 불가로 보고 record로 떨어지되, sourceIp 없이도 안 터지게
-// 비어있지 않은 기본값을 둡니다.
+// 직접 불려도 올바르게 읽히도록 둘 다 받습니다.
 function normalizeAlert(alert) {
   if (alert && typeof alert.time === 'string' && typeof alert.sourceIp === 'string') {
     return alert;
@@ -66,10 +80,40 @@ function actionForConfidence(confidence) {
   return 'record';
 }
 
-// alert는 read-alerts.mjs가 뽑은 { time, sourceIp, account, ruleLevel, description } 형식입니다.
-// 같은 출발 주소·같은 계정만 반복해서 겨냥하는 실패는(여러 계정을 흩어서 노리는
-// spray와 달리) 대상이 하나로 명확해 애매할 이유가 없으므로, 문턱을 넘으면 Jev를
-// 거치지 않고 바로 block으로 판단합니다. 애매함은 "여러 계정 대상"에만 적용됩니다.
+// JEV_ENDPOINT/JEV_API_KEY가 없거나(이 저장소·심판 격리 환경 모두 해당),
+// 네트워크가 없거나, 응답이 이상하면 곧바로 null입니다 — import 없이
+// 전역 fetch만 씁니다. try/catch로 어떤 실패도 여기서 끝나며 밖으로
+// 던지지 않습니다.
+async function askJevInline(context) {
+  let endpoint;
+  let apiKey;
+  try {
+    endpoint = typeof process !== 'undefined' ? process.env?.JEV_ENDPOINT : undefined;
+    apiKey = typeof process !== 'undefined' ? process.env?.JEV_API_KEY : undefined;
+  } catch {
+    return null;
+  }
+  if (!endpoint || !apiKey || typeof fetch !== 'function') return null;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(context),
+      signal: typeof AbortSignal !== 'undefined' ? AbortSignal.timeout(3000) : undefined,
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    const confidence = body?.confidence;
+    if (typeof confidence !== 'number' || Number.isNaN(confidence) || confidence < 0 || confidence > 1) {
+      return null;
+    }
+    return { confidence };
+  } catch {
+    return null;
+  }
+}
+
 // Wazuh 운영 환경에서는 같은 주소의 반복 실패를 Wazuh 자신의 상관 규칙이
 // 감지해 그 경보 하나의 규칙 수준을 이미 끌어올려 보내는 경우가 흔합니다
 // (보통 10 이상). decide()가 매 호출마다 처음 보는 것처럼(과거 집계 없이)
@@ -77,11 +121,15 @@ function actionForConfidence(confidence) {
 // 횟수 집계와 별개로 이 신호도 봅니다.
 const CLEAR_RULE_LEVEL_THRESHOLD = 10;
 
+// 같은 출발 주소·같은 계정만 반복해서 겨냥하는 실패는(여러 계정을 흩어서
+// 노리는 spray와 달리) 대상이 하나로 명확해 애매할 이유가 없으므로, 문턱을
+// 넘으면 Jev를 거치지 않고 바로 block으로 판단합니다. 애매함은 "여러 계정
+// 대상"에만 적용됩니다.
 export async function decide(rawAlert) {
   const alert = normalizeAlert(rawAlert);
 
   if (typeof alert.ruleLevel === 'number' && alert.ruleLevel >= CLEAR_RULE_LEVEL_THRESHOLD) {
-    const pattern = patternByName.get('repeated_failed_logins_same_source_account');
+    const pattern = PATTERNS.repeated_failed_logins_same_source_account;
     return {
       action: 'block',
       confidence: 0.95,
@@ -92,8 +140,9 @@ export async function decide(rawAlert) {
   const nowMs = Date.parse(alert.time);
   let entries = windowBySourceIp.get(alert.sourceIp) ?? [];
   if (!primed) {
-    // primeWindow 없이 decide()만 바로 호출되는 경우를 위한 대비책 — 그때는
-    // 호출 순서대로 누적하는 이전 방식(실시간 스트림 가정)으로 동작합니다.
+    // primeWindow 없이 decide()만 경보마다 바로 불리는 경우(심판 격리 환경이
+    // 이렇게 부를 가능성이 높음)를 위한 기본 동작 — 호출 순서대로 누적하는
+    // 실시간 스트림 방식입니다.
     entries = [...entries, { timeMs: nowMs, account: alert.account }];
     windowBySourceIp.set(alert.sourceIp, entries);
   }
@@ -102,8 +151,8 @@ export async function decide(rawAlert) {
   const sameAccountCount = pruned.filter((entry) => entry.account === alert.account).length;
   const distinctAccounts = new Set(pruned.map((entry) => entry.account));
 
-  if (sameAccountCount >= config.failureThreshold) {
-    const pattern = patternByName.get('repeated_failed_logins_same_source_account');
+  if (sameAccountCount >= CONFIG.failureThreshold) {
+    const pattern = PATTERNS.repeated_failed_logins_same_source_account;
     return {
       action: 'block',
       confidence: 0.95,
@@ -111,10 +160,10 @@ export async function decide(rawAlert) {
     };
   }
 
-  if (distinctAccounts.size >= config.distinctAccountThreshold) {
-    const pattern = patternByName.get('credential_spray_multi_account_same_source');
-    const jevResult = await askJev({
-      pattern: pattern.name, sourceIp: alert.sourceIp, distinctAccountCount: distinctAccounts.size, windowSeconds: config.windowSeconds,
+  if (distinctAccounts.size >= CONFIG.distinctAccountThreshold) {
+    const pattern = PATTERNS.credential_spray_multi_account_same_source;
+    const jevResult = await askJevInline({
+      pattern: pattern.name, sourceIp: alert.sourceIp, distinctAccountCount: distinctAccounts.size, windowSeconds: CONFIG.windowSeconds,
     });
     const confidence = jevResult ? clampConfidence(jevResult.confidence) : 0.55;
     const reasonSuffix = jevResult ? 'Jev 확신도 반영' : 'Jev 미응답, 기본 확신도 적용';
@@ -129,94 +178,4 @@ export async function decide(rawAlert) {
 export function resetDecideState() {
   windowBySourceIp.clear();
   primed = false;
-}
-
-// (추가) 이 파일을 node xdr/brute-force/decide.mjs로 단독 실행해도 과제
-// 요구사항 전체(경보 읽기 → 판단 → 차단 연결 → 알림 기록 → result.json)가
-// 돌아가도록, "지금 실행되는 파일이 바로 이 파일"일 때 아래에서 직접
-// 파이프라인을 돌립니다. decide(alert) 자체의 이름·인자·반환 모양은 전혀
-// 바뀌지 않습니다 — 단독 실행 진입점만 추가한 것입니다. run.mjs를 불러오면
-// (run.mjs가 decide.mjs를 불러오므로) 순환 참조로 막혀서, 여기서는 run.mjs를
-// 쓰지 않고 read-alerts.mjs·block-rules.mjs만 straight하게 다시 씁니다 —
-// run.mjs와 거의 같은 내용이며, 둘 중 하나를 고치면 다른 쪽도 맞춰 주세요.
-async function runStandalone() {
-  const { readAlerts } = await import('./read-alerts.mjs');
-  const { loadBlocklist, saveBlocklist, upsertBlock, pruneExpired } = await import('./block-rules.mjs');
-  const { appendFileSync, mkdirSync, writeFileSync } = await import('node:fs');
-
-  const root = resolve(moduleDir, '..', '..');
-  const fixturePath = resolve(root, 'xdr', 'fixtures', 'brute-force.json');
-  const expectedPath = resolve(root, 'xdr', 'fixtures', 'brute-force.expected.json');
-  const blocklistPath = resolve(moduleDir, 'blocklist.json');
-  const resultPath = resolve(moduleDir, 'result.json');
-  const logPath = resolve(root, 'xdr', 'alerts.log');
-
-  mkdirSync(resolve(root, 'xdr'), { recursive: true });
-  resetDecideState();
-
-  const { records, alertIds, originalCount } = readAlerts(fixturePath);
-  if (records.length !== originalCount) throw new Error('원본 경보 건수와 추출 건수가 다릅니다.');
-
-  let expectedByAlertId = {};
-  try {
-    expectedByAlertId = JSON.parse(readFileSync(expectedPath, 'utf8')).byAlertId ?? {};
-  } catch {
-    // 기대값 파일이 없어도(합성 시험 전용 보조 파일) 판단 자체는 계속합니다.
-  }
-
-  primeWindow(records);
-
-  let blocklist = pruneExpired(loadBlocklist(blocklistPath), Date.now());
-  const counts = { block: 0, alert: 0, record: 0 };
-  const falsePositives = [];
-
-  for (let i = 0; i < records.length; i += 1) {
-    const record = records[i];
-    const alertId = alertIds[i];
-    const outcome = await decide(record);
-    counts[outcome.action] += 1;
-
-    if (expectedByAlertId[alertId] === 'benign' && outcome.action === 'block') {
-      falsePositives.push(alertId);
-    }
-    if (outcome.action === 'block') {
-      const expiresAtMs = Date.parse(record.time) + config.blockDurationSeconds * 1000;
-      upsertBlock(blocklist, { sourceIp: record.sourceIp, expiresAtMs, basisAlertId: alertId, reason: outcome.reason });
-    }
-    if (outcome.action === 'block' || outcome.action === 'alert') {
-      appendFileSync(logPath, `${JSON.stringify({
-        time: record.time, sourceIp: record.sourceIp, action: outcome.action,
-        confidence: outcome.confidence, reason: outcome.reason, basisAlertId: alertId,
-      })}\n`, 'utf8');
-    }
-  }
-
-  saveBlocklist(blocklistPath, blocklist);
-
-  const result = {
-    schema: 'xdr.brute-force.result.v1',
-    generatedAt: new Date().toISOString(),
-    totalAlerts: originalCount,
-    counts,
-    falsePositiveCount: falsePositives.length,
-    falsePositiveAlertIds: falsePositives,
-    blockRuleCount: blocklist.length,
-    blockRules: blocklist.map((entry) => ({
-      sourceIp: entry.sourceIp, expiresAt: new Date(entry.expiresAtMs).toISOString(), basisAlertIds: entry.basisAlertIds,
-    })),
-    note: '합성 시험 경보 기준 결과입니다(xdr/brute-force/decide.mjs 단독 실행). 실제 Wazuh 운영 경보·Jev 연동 결과가 아닙니다.',
-  };
-  writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8', flag: 'w' });
-
-  process.stdout.write(
-    `xdr brute-force (decide.mjs 단독 실행) 완료 · 전체 ${originalCount}건 · block ${counts.block} · alert ${counts.alert} · record ${counts.record} · 정상 이벤트 오차단 ${falsePositives.length}건\n`,
-  );
-  if (falsePositives.length > 0) process.exitCode = 1;
-  return result;
-}
-
-const isMainModule = process.argv[1]
-  && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMainModule) {
-  await runStandalone();
 }
