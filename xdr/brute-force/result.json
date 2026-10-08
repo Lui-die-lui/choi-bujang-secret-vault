@@ -1,6 +1,6 @@
 {
   "schema": "xdr.brute-force.result.v1",
-  "generatedAt": "2026-10-07T12:17:52.753Z",
+  "generatedAt": "2026-10-08T05:23:07.509Z",
   "totalAlerts": 25,
   "counts": {
     "block": 17,
@@ -41,50 +41,5 @@
       ]
     }
   ],
-  "endToEndChecks": [
-    {
-      "name": "명확한 공격 요청 거부",
-      "sourceIp": "203.0.113.10",
-      "expectedBlocked": true,
-      "actualBlocked": true,
-      "passed": true
-    },
-    {
-      "name": "애매한 시도는 차단하지 않음",
-      "sourceIp": "198.51.100.77",
-      "expectedBlocked": false,
-      "actualBlocked": false,
-      "passed": true
-    },
-    {
-      "name": "정상 이벤트 주소는 통과",
-      "sourceIp": "203.0.113.99",
-      "expectedBlocked": false,
-      "actualBlocked": false,
-      "passed": true
-    },
-    {
-      "name": "전혀 무관한 주소는 통과",
-      "sourceIp": "203.0.113.254",
-      "expectedBlocked": false,
-      "actualBlocked": false,
-      "passed": true
-    },
-    {
-      "name": "만료 이후에는 같은 주소도 통과",
-      "sourceIp": "203.0.113.10",
-      "expectedBlocked": false,
-      "actualBlocked": false,
-      "passed": true
-    },
-    {
-      "name": "위조 가능한 x-forwarded-for보다 x-vercel-forwarded-for를 우선함",
-      "sourceIp": "203.0.113.10",
-      "expectedBlocked": true,
-      "actualBlocked": true,
-      "passed": true
-    }
-  ],
-  "endToEndAllPassed": true,
-  "note": "합성 시험 경보 기준 결과이며, api/auth/login.mjs가 실제로 쓰는 src/xdr-login-guard.mjs 함수를 격리된 메모리 저장소로 호출해 전체 경로(헤더 추출→저장소 조회→허용/거부)를 시험합니다. 실제 Supabase·Wazuh 운영 경보·Jev 연동 결과가 아닙니다."
+  "note": "합성 시험 경보 기준 결과입니다(xdr/brute-force/decide.mjs 단독 실행). 실제 Wazuh 운영 경보·Jev 연동 결과가 아닙니다."
 }
