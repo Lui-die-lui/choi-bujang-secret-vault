@@ -1,0 +1,22 @@
+{
+  "_notice": "시험용 데이터입니다. 값이 모두 가상인 합성 경보이며 실제 Wazuh 배포나 운영 로그에서 뽑은 자료가 아닙니다. 출발 주소는 RFC 5737 문서용 주소, 계정·주소·인자 값은 지어낸 것입니다. ALERT-0009의 token 값은 비밀값 가리기를 시험하려고 넣은 가짜 자리표시자입니다.",
+  "_groups": {
+    "normal": ["ALERT-0001", "ALERT-0002", "ALERT-0003", "ALERT-0004", "ALERT-0012"],
+    "clear": ["ALERT-0005", "ALERT-0006", "ALERT-0007", "ALERT-0008", "ALERT-0009"],
+    "ambiguous": ["ALERT-0010", "ALERT-0011"]
+  },
+  "alerts": [
+    { "id": "ALERT-0001", "timestamp": "2026-10-10T01:00:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31108, "level": 3, "description": "웹 접근: 메모 목록 요청 정상 처리(200)" }, "data": { "srcip": "203.0.113.99", "srcuser": "owner", "protocol": "GET", "url": "/notes?page=2", "id": "200" } },
+    { "id": "ALERT-0002", "timestamp": "2026-10-10T01:02:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31108, "level": 3, "description": "웹 접근: 검색 요청 정상 처리(200), 일반 낱말 검색" }, "data": { "srcip": "203.0.113.52", "srcuser": "pm", "protocol": "GET", "url": "/search?q=select+committee+report", "id": "200" } },
+    { "id": "ALERT-0003", "timestamp": "2026-10-10T01:04:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31108, "level": 2, "description": "웹 접근: 정적 파일 요청 정상 처리(200)" }, "data": { "srcip": "203.0.113.61", "protocol": "GET", "url": "/static/app.css", "id": "200" } },
+    { "id": "ALERT-0004", "timestamp": "2026-10-10T01:06:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31108, "level": 3, "description": "웹 접근: 메모 저장 요청 정상 처리(201)" }, "data": { "srcip": "203.0.113.99", "srcuser": "owner", "protocol": "POST", "url": "/api/my-notes", "id": "201" } },
+    { "id": "ALERT-0005", "timestamp": "2026-10-10T02:00:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31103, "level": 7, "description": "웹 공격: 요청 인자에 SQL 주입 구문(UNION SELECT) 포함" }, "data": { "srcip": "198.51.100.20", "protocol": "GET", "url": "/search?q=' UNION SELECT username,password FROM users--", "id": "500" } },
+    { "id": "ALERT-0006", "timestamp": "2026-10-10T02:03:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31152, "level": 10, "description": "웹 공격: 같은 출발 주소에서 SQL 주입 시도가 8건 반복됨" }, "data": { "srcip": "198.51.100.20", "protocol": "GET", "url": "/notes?id=1' OR '1'='1", "id": "200" } },
+    { "id": "ALERT-0007", "timestamp": "2026-10-10T02:10:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31105, "level": 7, "description": "웹 공격: 요청 인자에 스크립트 태그(<script>) 포함" }, "data": { "srcip": "198.51.100.21", "srcuser": "guest", "protocol": "GET", "url": "/search?q=<script>document.location='http://attacker.example/'</script>", "id": "200" } },
+    { "id": "ALERT-0008", "timestamp": "2026-10-10T02:15:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31104, "level": 7, "description": "웹 공격: 요청 인자에 경로 거슬러 올라가기(../)가 4회 반복됨" }, "data": { "srcip": "198.51.100.22", "protocol": "GET", "url": "/download?file=../../../../etc/passwd", "id": "404" } },
+    { "id": "ALERT-0009", "timestamp": "2026-10-10T02:20:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31154, "level": 10, "description": "웹 공격: 같은 출발 주소에서 스크립트 주입 시도가 6건 반복됨, 인자 token=FAKE-PLACEHOLDER-0000 동반" }, "data": { "srcip": "198.51.100.21", "srcuser": "guest", "protocol": "POST", "url": "/comment?token=FAKE-PLACEHOLDER-0000&text=<script>alert(1)</script>", "id": "200" } },
+    { "id": "ALERT-0010", "timestamp": "2026-10-10T03:00:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31101, "level": 5, "description": "웹 접근: 요청 인자에 작은따옴표 1개 포함, 400 응답" }, "data": { "srcip": "203.0.113.70", "srcuser": "intern", "protocol": "GET", "url": "/search?q=O'Brien", "id": "400" } },
+    { "id": "ALERT-0011", "timestamp": "2026-10-10T03:05:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31101, "level": 5, "description": "웹 접근: 요청 인자에 상위 경로(../) 1회 포함, 404 응답" }, "data": { "srcip": "203.0.113.71", "protocol": "GET", "url": "/docs?path=../readme.txt", "id": "404" } },
+    { "id": "ALERT-0012", "timestamp": "2026-10-10T03:10:00Z", "agent": { "name": "choi-bujang-pc" }, "rule": { "id": 31101, "level": 5, "description": "웹 접근: 요청 인자에 HTML 태그 포함(스크립트 태그 아님)" }, "data": { "srcip": "203.0.113.72", "srcuser": "guest2", "protocol": "POST", "url": "/comment?text=<b>hello</b>", "id": "200" } }
+  ]
+}

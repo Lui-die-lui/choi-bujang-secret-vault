@@ -194,6 +194,17 @@ git show HEAD:public/data.json
 
 이 중 무엇도 "운영 심판 판정"이나 "실제 공격 차단 증거"로 보고하지 않습니다 — `npm run xdr:run`은 격리된 저장소로 하는 로컬 학생 연습이고, `npm run xdr:sync`는 실제 DB에 닿는 별도의 명시적 명령입니다.
 
+## 보너스 xdr-02: 웹 주입 공격 탐지 (저장점)
+
+- **지금 작동하는 것(로컬)**: `xdr/fixtures/web-injection.json`(값이 모두 가상인 합성 시험 경보 12건, 실제 Wazuh 배포에서 뽑은 자료가 아님)을 읽어 판단하고, 알림과 로컬 거부 규칙을 만듭니다.
+  - `xdr/web-injection/read-alerts.mjs`: 시각·출발 주소·계정·규칙 수준·설명만 뽑는 확인용 모듈. 설명 안의 비밀값처럼 보이는 값은 가립니다.
+  - `xdr/web-injection/patterns.json`: 요청 인자 안의 SQL 구문, 스크립트 태그, 경로 거슬러 올라가기(`../`) 반복 세 신호의 패턴 7개(근거 MITRE ATT&CK T1190). 확신도 숫자는 직접 정한 값입니다.
+  - `xdr/web-injection/decide.mjs`: `import` 없는 단일 파일. `decide(alert)`가 `data.url`의 `?` 뒤 부분만 패턴과 맞춰 `{action, confidence, reason}`을 돌려줍니다(0.85 이상 block, 0.5 이상 alert, 그 아래 record).
+  - `xdr/web-injection/respond.mjs`: 같은 출발 주소에서 서로 다른 경보 번호로 block 후보가 2건 이상일 때만 로컬 거부 규칙(`xdr/web-injection/blocklist.json`, 처리 시각 + 1시간 만료, 근거 경보 번호 포함)을 만들고, 모든 경보를 `xdr/alerts.log`에 한 줄씩 남깁니다(요청 주소·인자는 남기지 않음). 두 파일은 Git에 올리지 않습니다.
+- **다시 실행하는 방법**: `npm run xdr:run -- web-injection` → `xdr/web-injection/result.json` 갱신. 이번 저장점 기준 결과는 block 5 · alert 2 · record 5, 정상 이벤트 block 판정 0건, 정상 이벤트 거부 규칙 포함 0건, 로컬 거부 규칙 2건입니다(block 판정 건수와 거부 규칙 수는 다른 숫자입니다).
+- **연결되지 않은 것**: 거부 규칙은 로컬 파일에만 있고 **실제 ZTNA 요청 경로에는 연결되지 않았습니다.** `docs/DECIDER_REQUEST.md`의 요청 계약에는 출발 주소도 쿼리 원문도 없어 `src/decider.mjs`에서 이 규칙을 대조할 수 없고, 출발 주소로 거부하는 기존 경로는 로그인 전용(`src/xdr-login-guard.mjs`)이라 넣지 않았습니다. `src/decider.mjs`와 `RULE_IDS`는 바꾸지 않았습니다.
+- **확인하지 못한 것**: 실제 Wazuh 경보에서 요청 인자가 어느 필드에 담기는지, 심판의 경보 모양과 정답표. 위 결과는 로컬 학생 연습이며 심판 판정이 아닙니다.
+
 ## 시작 틀의 자동 처리
 
 `vercel.json`은 정적 결과물 `public`을 배포합니다. 빌드 명령 `npm run build`는 Vercel이 제공하는 GitHub 저장소 소유자·이름, 커밋 SHA, 배포 URL을 검증하고 `public/aleph.json`을 생성합니다. 이 값이 없으면 빌드가 실패하므로, 성공한 것처럼 빈 주소를 내보내지 않습니다. `aleph.json`의 내용만으로 저장소 소유권이나 방어 성공을 인정하지 않습니다. 심판이 공개 저장소의 실제 커밋과 배포된 자료를 따로 대조해야 합니다.

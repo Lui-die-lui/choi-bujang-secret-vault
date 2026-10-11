@@ -1,0 +1,133 @@
+{
+  "schema": "xdr.web-injection.result.v1",
+  "generatedAt": "2026-10-11T11:20:43.113Z",
+  "totalAlerts": 12,
+  "loggedLinesThisRun": 12,
+  "counts": {
+    "block": 5,
+    "alert": 2,
+    "record": 5
+  },
+  "falsePositiveCount": 0,
+  "falsePositiveAlertIds": [],
+  "normalInDenyRuleCount": 0,
+  "normalInDenyRuleAlertIds": [],
+  "blockRuleCount": 2,
+  "blockRules": [
+    {
+      "sourceIp": "198.51.100.20",
+      "expiresAt": "2026-10-11T12:20:43.113Z",
+      "basisAlertIds": [
+        "ALERT-0005",
+        "ALERT-0006"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.21",
+      "expiresAt": "2026-10-11T12:20:43.113Z",
+      "basisAlertIds": [
+        "ALERT-0007",
+        "ALERT-0009"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "alertId": "ALERT-0001",
+      "time": "2026-10-10T01:00:00Z",
+      "sourceIp": "203.0.113.99",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "ALERT-0002",
+      "time": "2026-10-10T01:02:00Z",
+      "sourceIp": "203.0.113.52",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "ALERT-0003",
+      "time": "2026-10-10T01:04:00Z",
+      "sourceIp": "203.0.113.61",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_request_argument"
+    },
+    {
+      "alertId": "ALERT-0004",
+      "time": "2026-10-10T01:06:00Z",
+      "sourceIp": "203.0.113.99",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_request_argument"
+    },
+    {
+      "alertId": "ALERT-0005",
+      "time": "2026-10-10T02:00:00Z",
+      "sourceIp": "198.51.100.20",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "sql_union_select_in_argument"
+    },
+    {
+      "alertId": "ALERT-0006",
+      "time": "2026-10-10T02:03:00Z",
+      "sourceIp": "198.51.100.20",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "sql_quote_boolean_tautology_in_argument"
+    },
+    {
+      "alertId": "ALERT-0007",
+      "time": "2026-10-10T02:10:00Z",
+      "sourceIp": "198.51.100.21",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "script_tag_in_argument"
+    },
+    {
+      "alertId": "ALERT-0008",
+      "time": "2026-10-10T02:15:00Z",
+      "sourceIp": "198.51.100.22",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "path_traversal_repeated_in_argument"
+    },
+    {
+      "alertId": "ALERT-0009",
+      "time": "2026-10-10T02:20:00Z",
+      "sourceIp": "198.51.100.21",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "script_tag_in_argument"
+    },
+    {
+      "alertId": "ALERT-0010",
+      "time": "2026-10-10T03:00:00Z",
+      "sourceIp": "203.0.113.70",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "ambiguous_lone_quote_in_argument"
+    },
+    {
+      "alertId": "ALERT-0011",
+      "time": "2026-10-10T03:05:00Z",
+      "sourceIp": "203.0.113.71",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "ambiguous_single_path_traversal_in_argument"
+    },
+    {
+      "alertId": "ALERT-0012",
+      "time": "2026-10-10T03:10:00Z",
+      "sourceIp": "203.0.113.72",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    }
+  ],
+  "note": "합성 시험 경보 기준의 로컬 결과입니다. counts.block은 판정 건수이고 blockRuleCount는 같은 출발 주소에서 block 후보가 2건 이상일 때만 만들어지는 로컬 거부 규칙 수입니다. 규칙은 xdr/web-injection/blocklist.json에만 있고 실제 요청 처리 경로에는 연결되지 않았습니다. 실제 Wazuh 운영 경보나 심판 판정 결과가 아닙니다."
+}
