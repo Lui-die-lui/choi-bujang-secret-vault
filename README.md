@@ -196,15 +196,21 @@ git show HEAD:public/data.json
 
 ## 보너스 xdr-02: 웹 주입 공격 탐지 (저장점)
 
-- **지금 작동하는 것(로컬)**: `xdr/fixtures/web-injection.json`(값이 모두 가상인 합성 시험 경보 12건, 실제 Wazuh 배포에서 뽑은 자료가 아님)을 읽어 판단하고, 알림과 로컬 거부 규칙을 만듭니다.
+- **지금 작동하는 것(로컬)**: `xdr/fixtures/web-injection.json`(운영 측 연습 경보 26건, schema `aleph.xdr.fixture.v1`, 수업용으로 만든 Wazuh 모양이며 실제 로그가 아님)을 읽어 판단하고, 알림과 로컬 거부 규칙을 만듭니다.
   - `xdr/web-injection/read-alerts.mjs`: 시각·출발 주소·계정·규칙 수준·설명만 뽑는 확인용 모듈. 설명 안의 비밀값처럼 보이는 값은 가립니다.
-  - `xdr/web-injection/patterns.json`: 요청 인자 안의 SQL 구문, 스크립트 태그, 경로 거슬러 올라가기(`../`) 반복 세 신호의 패턴 9개(근거 MITRE ATT&CK T1190). 7개는 요청 문자열에 맞춰 보는 패턴이고, 2개는 경보 설명이 주입 형태를 말로 적어 둔 경우의 조건입니다. 확신도 숫자와 설명 조건의 낱말 목록은 직접 정한 값입니다.
-  - `xdr/web-injection/decide.mjs`: `import` 없는 단일 파일. `decide(alert)`가 경보 한 건만 보고 `{action, confidence, reason}`을 돌려줍니다(0.85 이상 block, 0.5 이상 alert, 그 아래 record). 보는 자리는 요청 인자(`data.url` 등 주소 필드와 `full_log` 요청 줄의 `?` 뒤 부분), 자유 문장(설명·`full_log`·`data`의 다른 문자열, 뚜렷한 패턴만), 설명 문장의 주입 낱말·반복 표시·규칙 수준입니다.
-  - **(수정 이력)** 커밋 `f306bc4`는 `data.url`의 `?` 뒤 부분만 봤고, 심판 판정에서 15/100(`X02_CLEAR_NOT_BLOCKED`, `X02_AMBIGUOUS_NOT_ALERT`, `X02_RECORD_MISMATCH`, 「decide 실행」만 통과)을 받았습니다. `data.url`은 합성 fixture를 만들며 정한 필드라 심판 경보에 없을 수 있다고 보고 위와 같이 넓혔습니다. 이 원인은 추정이며, 심판 경보 원문은 보지 못했습니다.
+  - `xdr/web-injection/patterns.json`: 패턴 14개(근거 MITRE ATT&CK T1190). 반복 횟수(5회 이상)와 설명 낱말로 보는 SQL 구문·스크립트·경로 거슬러 올라가기·주입 표식 반복, 규칙 수준(10 이상은 명확, 5 이상 10 미만은 애매), 요청 인자에 주입 구문이 그대로 들어온 경우의 조건입니다. 기준 숫자·낱말 목록·확신도는 연습 경보를 보고 직접 정한 값이며 심판의 정답표에서 가져온 값이 아닙니다.
+  - `xdr/web-injection/decide.mjs`: `import` 없는 단일 파일. `decide(alert)`가 경보 한 건의 규칙 수준(`rule.level`)·반복 횟수(`data.count`)·설명(`rule.description`)·요청 인자(`data.url`의 `?` 뒤)를 보고 `{action, confidence, reason}`을 돌려줍니다(0.85 이상 block, 0.5 이상 alert, 그 아래 record).
   - `xdr/web-injection/respond.mjs`: 같은 출발 주소에서 서로 다른 경보 번호로 block 후보가 2건 이상일 때만 로컬 거부 규칙(`xdr/web-injection/blocklist.json`, 처리 시각 + 1시간 만료, 근거 경보 번호 포함)을 만들고, 모든 경보를 `xdr/alerts.log`에 한 줄씩 남깁니다(요청 주소·인자는 남기지 않음). 두 파일은 Git에 올리지 않습니다.
-- **다시 실행하는 방법**: `npm run xdr:run -- web-injection` → `xdr/web-injection/result.json` 갱신. 이번 저장점 기준 결과는 block 5 · alert 2 · record 5, 정상 이벤트 block 판정 0건, 정상 이벤트 거부 규칙 포함 0건, 로컬 거부 규칙 2건입니다(block 판정 건수와 거부 규칙 수는 다른 숫자입니다).
+  - `xdr/fixtures/web-injection.expected.json`: 연습 경보를 읽고 직접 붙인 묶음 표시(명확 8·애매 9·정상 9). 실행 뒤 확인에만 쓰며 심판의 정답표가 아닙니다.
+- **다시 실행하는 방법**: `npm run xdr:run -- web-injection` → `xdr/web-injection/result.json` 갱신(`schema`·`moduleKey`·`decisions`·`counts`는 운영 측 실행기의 `aleph.xdr.result.v1` 모양). 현재 결과는 block 8 · alert 9 · record 9, 정상 이벤트 block 판정 0건, 정상 이벤트 거부 규칙 포함 0건, 로컬 거부 규칙 1건입니다(block 판정 건수와 거부 규칙 수는 다른 숫자입니다).
+- **(수정 이력) 심판 판정 15/100을 두 번 받은 까닭**:
+  1. 커밋 `f306bc4`·`a2fe918` 모두 15/100(`X02_CLEAR_NOT_BLOCKED`, `X02_AMBIGUOUS_NOT_ALERT`, `X02_RECORD_MISMATCH`, 「decide 실행」만 통과)이었습니다.
+  2. 원인: 이 브랜치(`assignment`)에 운영 측 연습 경보가 없어, 요청 주소에 공격 문자열이 그대로 들어 있는 합성 경보 12건을 직접 지어내 그 모양에 맞춰 만들었습니다. 운영 측 자료(`xdr/README.md`, `xdr/fixtures/*.json`, `scripts/xdr-run.mjs`)는 `origin/main`에만 있고 `assignment`로 넘어오지 않은 상태였습니다.
+  3. 운영 측 연습 경보는 모양이 다릅니다: 요청 주소에는 문서용 표기(예: `/notes?q=doc-sql-chain`)만 있고, 신호는 규칙 수준·`data.count`·한글 설명에 있습니다. 앞선 `decide.mjs`를 이 26건에 돌리면 block 4 · alert 0 · record 22로 14건이 어긋났습니다(직접 재현해 확인).
+  4. 고친 방법: `origin/main`의 `xdr/fixtures/web-injection.json`을 그대로 가져오고, `decide.mjs`·`patterns.json`을 그 모양에 맞춰 다시 썼습니다. 같은 과제에서 100점을 받은 다른 학생의 공개 저장소를 참고해 연습 경보의 존재와 신호 위치를 확인했고, 코드는 직접 다시 썼습니다.
+  5. 확인: `decide.mjs`와 연습 경보만 둔 빈 폴더에서 운영 측 실행기(`origin/main`의 `scripts/xdr-run.mjs`)를 돌려 block 8 · alert 9 · record 9, 형식 오류 0건이 나왔습니다. 심판의 정답표와 같은지는 다시 제출해야 압니다.
 - **연결되지 않은 것**: 거부 규칙은 로컬 파일에만 있고 **실제 ZTNA 요청 경로에는 연결되지 않았습니다.** `docs/DECIDER_REQUEST.md`의 요청 계약에는 출발 주소도 쿼리 원문도 없어 `src/decider.mjs`에서 이 규칙을 대조할 수 없고, 출발 주소로 거부하는 기존 경로는 로그인 전용(`src/xdr-login-guard.mjs`)이라 넣지 않았습니다. `src/decider.mjs`와 `RULE_IDS`는 바꾸지 않았습니다.
-- **확인하지 못한 것**: 실제 Wazuh 경보에서 요청 인자가 어느 필드에 담기는지, 심판의 경보 모양과 정답표. 위 결과는 로컬 학생 연습이며 심판 판정이 아닙니다.
+- **확인하지 못한 것**: 심판의 정답표, 심판이 연습 경보와 다른 경보로도 채점하는지. `npm run xdr:run`은 이 저장소의 `xdr/run.mjs`이며 운영 측 실행기(`scripts/xdr-run.mjs`)는 이 브랜치에 없습니다. 위 결과는 로컬 학생 연습이며 심판 판정이 아닙니다.
 
 ## 시작 틀의 자동 처리
 

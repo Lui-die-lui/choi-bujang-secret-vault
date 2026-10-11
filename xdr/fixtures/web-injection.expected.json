@@ -1,0 +1,12 @@
+{
+  "_notice": "시험용 기대값입니다. 운영 측 연습 경보(xdr/fixtures/web-injection.json)의 설명·규칙 수준·반복 횟수를 읽고 직접 붙인 묶음 표시이며, 심판의 정답표가 아닙니다. decide()의 판단과는 별개로, respond.mjs와 run.mjs가 정상 이벤트 오차단 여부와 묶음별 결과를 확인하는 데만 씁니다.",
+  "_labels": "attack=명확한 공격(차단 기대), ambiguous=애매한 시도(알림 기대), benign=정상 이벤트(기록만 기대, 차단되면 오차단)",
+  "byAlertId": {
+    "wi-01": "attack", "wi-02": "attack", "wi-03": "attack", "wi-04": "attack",
+    "wi-05": "attack", "wi-06": "attack", "wi-07": "attack", "wi-08": "attack",
+    "wi-09": "ambiguous", "wi-10": "ambiguous", "wi-11": "ambiguous", "wi-12": "ambiguous", "wi-13": "ambiguous",
+    "wi-14": "ambiguous", "wi-15": "ambiguous", "wi-16": "ambiguous", "wi-17": "ambiguous",
+    "wi-18": "benign", "wi-19": "benign", "wi-20": "benign", "wi-21": "benign", "wi-22": "benign",
+    "wi-23": "benign", "wi-24": "benign", "wi-25": "benign", "wi-26": "benign"
+  }
+}

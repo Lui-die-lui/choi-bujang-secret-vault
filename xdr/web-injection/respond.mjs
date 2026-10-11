@@ -12,7 +12,7 @@
 // (docs/DECIDER_REQUEST.md)에는 출발 주소도 쿼리 원문도 없어 이 규칙을 대조할 수 없고,
 // 출발 주소로 거부하는 기존 경로는 로그인 전용(src/xdr-login-guard.mjs)뿐이라 웹 주입
 // 규칙을 거기에 넣지 않았습니다. 판정기 규칙(RULE_IDS)도 건드리지 않습니다.
-import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decide } from './decide.mjs';
@@ -23,6 +23,21 @@ const root = resolve(moduleDir, '..', '..');
 const DEFAULT_FIXTURE_PATH = resolve(root, 'xdr', 'fixtures', 'web-injection.json');
 const DEFAULT_BLOCKLIST_PATH = resolve(moduleDir, 'blocklist.json');
 const DEFAULT_LOG_PATH = resolve(root, 'xdr', 'alerts.log');
+const DEFAULT_EXPECTED_PATH = resolve(root, 'xdr', 'fixtures', 'web-injection.expected.json');
+
+// 직접 붙인 묶음 표시(web-injection.expected.json)를 { normal, clear, ambiguous } 경보 번호
+// 목록으로 바꿉니다. 판단에는 쓰지 않고 실행 뒤 확인에만 씁니다. 파일이 없으면 빈 묶음입니다.
+const GROUP_OF_LABEL = { benign: 'normal', attack: 'clear', ambiguous: 'ambiguous' };
+function loadGroups(expectedPath) {
+  const groups = { normal: [], clear: [], ambiguous: [] };
+  if (!existsSync(expectedPath)) return groups;
+  const byAlertId = JSON.parse(readFileSync(expectedPath, 'utf8')).byAlertId ?? {};
+  for (const [alertId, label] of Object.entries(byAlertId)) {
+    const group = GROUP_OF_LABEL[label];
+    if (group) groups[group].push(alertId);
+  }
+  return groups;
+}
 
 // xdr/brute-force/run.mjs의 임시 거부 규칙과 같은 만료 길이입니다. 다만 만료 시각은
 // 경보 시각이 아니라 respond 처리 시각(nowMs)에서 셉니다 — 경보 시각이 과거면 규칙이
@@ -69,6 +84,7 @@ export function respond({
   fixturePath = DEFAULT_FIXTURE_PATH,
   blocklistPath = DEFAULT_BLOCKLIST_PATH,
   logPath = DEFAULT_LOG_PATH,
+  expectedPath = DEFAULT_EXPECTED_PATH,
   nowMs = Date.now(),
 } = {}) {
   const raw = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -116,7 +132,7 @@ export function respond({
     blocklist,
     ruleSourceIps: [...ruleSourceIps],
     processedAtMs: nowMs,
-    groups: raw._groups ?? {},
+    groups: loadGroups(expectedPath),
   };
 }
 

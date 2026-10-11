@@ -1,133 +1,187 @@
 {
-  "schema": "xdr.web-injection.result.v1",
-  "generatedAt": "2026-10-11T11:40:00.345Z",
-  "totalAlerts": 12,
-  "loggedLinesThisRun": 12,
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "web-injection",
+  "decisions": [
+    {
+      "alertId": "wi-01",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "repeated_sql_marker"
+    },
+    {
+      "alertId": "wi-02",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "repeated_script_marker"
+    },
+    {
+      "alertId": "wi-03",
+      "action": "block",
+      "confidence": 0.92,
+      "reason": "repeated_path_traversal_marker"
+    },
+    {
+      "alertId": "wi-04",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "repeated_sql_marker"
+    },
+    {
+      "alertId": "wi-05",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "repeated_sql_marker"
+    },
+    {
+      "alertId": "wi-06",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "escalated_rule_level"
+    },
+    {
+      "alertId": "wi-07",
+      "action": "block",
+      "confidence": 0.92,
+      "reason": "repeated_path_traversal_marker"
+    },
+    {
+      "alertId": "wi-08",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "repeated_sql_marker"
+    },
+    {
+      "alertId": "wi-09",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "ambiguous_single_injection_like_marker"
+    },
+    {
+      "alertId": "wi-10",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "ambiguous_mid_rule_level"
+    },
+    {
+      "alertId": "wi-11",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "ambiguous_mid_rule_level"
+    },
+    {
+      "alertId": "wi-12",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "ambiguous_mid_rule_level"
+    },
+    {
+      "alertId": "wi-13",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "ambiguous_mid_rule_level"
+    },
+    {
+      "alertId": "wi-14",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "ambiguous_mid_rule_level"
+    },
+    {
+      "alertId": "wi-15",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "ambiguous_single_injection_like_marker"
+    },
+    {
+      "alertId": "wi-16",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "ambiguous_single_injection_like_marker"
+    },
+    {
+      "alertId": "wi-17",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "ambiguous_single_injection_like_marker"
+    },
+    {
+      "alertId": "wi-18",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-19",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-20",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-21",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-22",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-23",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-24",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-25",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    },
+    {
+      "alertId": "wi-26",
+      "action": "record",
+      "confidence": 0,
+      "reason": "no_pattern_matched"
+    }
+  ],
   "counts": {
-    "block": 5,
-    "alert": 2,
-    "record": 5
+    "block": 8,
+    "alert": 9,
+    "record": 9
   },
+  "generatedAt": "2026-10-11T11:50:07.220Z",
+  "totalAlerts": 26,
+  "loggedLinesThisRun": 26,
   "falsePositiveCount": 0,
   "falsePositiveAlertIds": [],
   "normalInDenyRuleCount": 0,
   "normalInDenyRuleAlertIds": [],
-  "blockRuleCount": 2,
+  "labelMismatchAlertIds": [],
+  "blockRuleCount": 1,
   "blockRules": [
     {
-      "sourceIp": "198.51.100.20",
-      "expiresAt": "2026-10-11T12:40:00.345Z",
+      "sourceIp": "203.0.113.10",
+      "expiresAt": "2026-10-11T12:50:07.220Z",
       "basisAlertIds": [
-        "ALERT-0005",
-        "ALERT-0006"
-      ]
-    },
-    {
-      "sourceIp": "198.51.100.21",
-      "expiresAt": "2026-10-11T12:40:00.345Z",
-      "basisAlertIds": [
-        "ALERT-0007",
-        "ALERT-0009"
+        "wi-01",
+        "wi-02"
       ]
     }
   ],
-  "decisions": [
-    {
-      "alertId": "ALERT-0001",
-      "time": "2026-10-10T01:00:00Z",
-      "sourceIp": "203.0.113.99",
-      "action": "record",
-      "confidence": 0,
-      "reason": "no_pattern_matched"
-    },
-    {
-      "alertId": "ALERT-0002",
-      "time": "2026-10-10T01:02:00Z",
-      "sourceIp": "203.0.113.52",
-      "action": "record",
-      "confidence": 0,
-      "reason": "no_pattern_matched"
-    },
-    {
-      "alertId": "ALERT-0003",
-      "time": "2026-10-10T01:04:00Z",
-      "sourceIp": "203.0.113.61",
-      "action": "record",
-      "confidence": 0,
-      "reason": "no_pattern_matched"
-    },
-    {
-      "alertId": "ALERT-0004",
-      "time": "2026-10-10T01:06:00Z",
-      "sourceIp": "203.0.113.99",
-      "action": "record",
-      "confidence": 0,
-      "reason": "no_pattern_matched"
-    },
-    {
-      "alertId": "ALERT-0005",
-      "time": "2026-10-10T02:00:00Z",
-      "sourceIp": "198.51.100.20",
-      "action": "block",
-      "confidence": 0.95,
-      "reason": "sql_union_select_in_argument"
-    },
-    {
-      "alertId": "ALERT-0006",
-      "time": "2026-10-10T02:03:00Z",
-      "sourceIp": "198.51.100.20",
-      "action": "block",
-      "confidence": 0.9,
-      "reason": "sql_quote_boolean_tautology_in_argument"
-    },
-    {
-      "alertId": "ALERT-0007",
-      "time": "2026-10-10T02:10:00Z",
-      "sourceIp": "198.51.100.21",
-      "action": "block",
-      "confidence": 0.95,
-      "reason": "script_tag_in_argument"
-    },
-    {
-      "alertId": "ALERT-0008",
-      "time": "2026-10-10T02:15:00Z",
-      "sourceIp": "198.51.100.22",
-      "action": "block",
-      "confidence": 0.9,
-      "reason": "path_traversal_repeated_in_argument"
-    },
-    {
-      "alertId": "ALERT-0009",
-      "time": "2026-10-10T02:20:00Z",
-      "sourceIp": "198.51.100.21",
-      "action": "block",
-      "confidence": 0.95,
-      "reason": "script_tag_in_argument"
-    },
-    {
-      "alertId": "ALERT-0010",
-      "time": "2026-10-10T03:00:00Z",
-      "sourceIp": "203.0.113.70",
-      "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous_described_injection_single"
-    },
-    {
-      "alertId": "ALERT-0011",
-      "time": "2026-10-10T03:05:00Z",
-      "sourceIp": "203.0.113.71",
-      "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous_described_injection_single"
-    },
-    {
-      "alertId": "ALERT-0012",
-      "time": "2026-10-10T03:10:00Z",
-      "sourceIp": "203.0.113.72",
-      "action": "record",
-      "confidence": 0,
-      "reason": "no_pattern_matched"
-    }
-  ],
-  "note": "합성 시험 경보 기준의 로컬 결과입니다. counts.block은 판정 건수이고 blockRuleCount는 같은 출발 주소에서 block 후보가 2건 이상일 때만 만들어지는 로컬 거부 규칙 수입니다. 규칙은 xdr/web-injection/blocklist.json에만 있고 실제 요청 처리 경로에는 연결되지 않았습니다. 실제 Wazuh 운영 경보나 심판 판정 결과가 아닙니다."
+  "note": "운영 측 연습 경보 기준의 로컬 결과입니다. counts.block은 판정 건수이고 blockRuleCount는 같은 출발 주소에서 block 후보가 2건 이상일 때만 만들어지는 로컬 거부 규칙 수입니다. labelMismatchAlertIds는 직접 붙인 묶음 표시(web-injection.expected.json)와 다른 판단이며 심판의 정답표와 비교한 것이 아닙니다. 규칙은 xdr/web-injection/blocklist.json에만 있고 실제 요청 처리 경로에는 연결되지 않았습니다. 심판 판정 결과가 아닙니다."
 }

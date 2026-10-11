@@ -1,69 +1,104 @@
 {
-  "_notice": "웹 주입 시도의 알려진 형태를 정리한 목록입니다. 신호는 요청 인자 안의 SQL 구문, 스크립트 태그, 경로 거슬러 올라가기(../) 반복 세 가지로만 한정했습니다. 찾는 조건은 합성 시험 자료(xdr/fixtures/web-injection.json)의 모양을 기준으로 적은 것이며, 실제 Wazuh 경보 형식에서 요청 인자가 어느 필드에 담기는지는 확인하지 않았습니다. confidence 값은 제작 3의 block(0.85 이상)·alert(0.5 이상) 구분에 맞춰 직접 정한 값이고 외부 기준에서 가져온 값이 아닙니다. 순서는 확신도 내림차순입니다.",
-  "input": "검사 대상은 요청 인자 문자열입니다. 합성 시험 자료에서는 data.url의 첫 '?' 뒤 부분이며, 없으면 빈 문자열로 봅니다. 조건을 맞춰 보기 전에 '+'를 공백으로 바꾸고 퍼센트 인코딩을 한 번 풀고 소문자로 바꿉니다. 인자 문자열이 비어 있으면 어떤 패턴에도 맞지 않습니다. (바로잡음 1, 심판 판정 X02_CLEAR_NOT_BLOCKED 이후) 요청 인자는 data.url 외에 data의 uri·path·request·query·args·params 필드와 full_log 요청 줄(\"GET 주소 HTTP/1.1\")의 주소에서도 꺼냅니다. 설명(rule.description)·full_log·data의 다른 문자열 값 같은 자유 문장에는 뚜렷한 패턴 다섯 가지만 맞춰 보되, 따옴표 뒤 주석 기호 조건과 애매한 패턴 두 가지는 정상 로그 줄에도 흔해 자유 문장에는 쓰지 않습니다. 자리마다 따로 맞춰 본 뒤 가장 확신도 높은 패턴 하나를 씁니다. 심판 경보의 실제 형식은 확인하지 못했습니다.",
+  "_notice": "웹 주입 시도의 알려진 형태를 정리한 목록입니다. decide.mjs는 심판의 격리 환경(import 없음) 때문에 이 패턴들을 파일 맨 위에 직접 옮겨 적어 둡니다 — 이 파일을 고치면 decide.mjs의 PATTERNS 상수도 같이 고쳐 주세요. 순서는 확신도 내림차순입니다. (바로잡음 2) 운영 측 연습 경보(xdr/fixtures/web-injection.json)의 실제 모양에 맞춰 다시 정리했습니다: 요청 주소에는 문서용 표기만 있고 신호는 규칙 수준·반복 횟수·한글 설명에 들어 있습니다. 반복 기준 5회, 규칙 수준 기준 10·5, 낱말 목록, confidence 값은 그 연습 경보를 보고 직접 정한 값이며 심판의 정답표에서 가져온 값이 아닙니다.",
+  "input": "경보 한 건에서 네 가지를 봅니다. (1) 설명: rule.description(과 있으면 full_log 등)을 소문자로 바꾼 문장. (2) 반복 횟수: data.count가 있으면 그 값, 없으면 설명의 \"12번\"·\"8건\" 같은 표현. (3) 규칙 수준: rule.level. (4) 요청 인자: data.url 등 주소 필드와 full_log 요청 줄에서 첫 '?' 뒤 부분을 꺼내 '+'를 공백으로 바꾸고 퍼센트 인코딩을 한 번 풀고 소문자로 바꾼 문자열. 아래에서 '반복됨'은 반복 횟수가 5 이상이라는 뜻입니다.",
   "patterns": [
     {
       "name": "sql_union_select_in_argument",
       "signal": "sql_syntax",
-      "condition": "인자 문자열이 정규식 \\bunion\\b(\\s+all)?\\s+select\\b 에 맞음 — UNION 과 SELECT 가 이어 붙은 조회 덧붙이기 구문",
+      "condition": "요청 인자가 정규식 \\bunion\\b(\\s+all)?\\s+select\\b 에 맞음 — UNION 과 SELECT 가 이어 붙은 조회 덧붙이기 구문이 인자에 그대로 들어 있음",
       "confidence": 0.95,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 입력 처리 약점에 SQL 조회문을 덧붙여 자료를 읽어 내는 악용 형태"
     },
     {
       "name": "script_tag_in_argument",
       "signal": "script_tag",
-      "condition": "인자 문자열이 정규식 <\\s*script\\b 에 맞음 — 여는 스크립트 태그가 인자 값에 그대로 들어 있음",
+      "condition": "요청 인자가 정규식 <\\s*script\\b 에 맞음 — 여는 스크립트 태그가 인자 값에 그대로 들어 있음",
       "confidence": 0.95,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱이 입력을 걸러 내지 않는 약점에 스크립트를 밀어 넣는 악용 형태"
     },
     {
+      "name": "repeated_sql_marker",
+      "signal": "sql_syntax",
+      "condition": "반복됨(5회 이상)이고 설명에 'sql'·'데이터베이스 조회'·'select' 중 하나가 있음 — SQL 구문 표기가 같은 주소에서 되풀이됨",
+      "confidence": 0.93,
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 조회 인자에 SQL 구문을 되풀이해 밀어 넣는 악용 형태"
+    },
+    {
+      "name": "repeated_script_marker",
+      "signal": "script_tag",
+      "condition": "반복됨(5회 이상)이고 설명에 '스크립트' 또는 'script'가 있음 — 스크립트 삽입 표기가 같은 주소에서 되풀이됨",
+      "confidence": 0.93,
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 입력 칸에 스크립트를 되풀이해 밀어 넣는 악용 형태"
+    },
+    {
+      "name": "repeated_path_traversal_marker",
+      "signal": "path_traversal",
+      "condition": "반복됨(5회 이상)이고 설명에 '거슬러'·'경로 이탈'·'../' 중 하나가 있음 — 경로를 위로 거슬러 올라가는 표기가 되풀이됨",
+      "confidence": 0.92,
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 파일 경로 처리 약점으로 허용 폴더 밖 파일을 읽어 내려는 악용 형태"
+    },
+    {
       "name": "sql_quote_boolean_tautology_in_argument",
       "signal": "sql_syntax",
-      "condition": "인자 문자열이 정규식 ['\"]\\s*(or|and)\\s+['\"]?\\w+['\"]?\\s*=\\s*['\"]?\\w+ 에 맞음 — 따옴표로 값을 끊은 뒤 OR/AND 와 항상 참인 비교식을 붙임",
+      "condition": "요청 인자가 정규식 ['\"]\\s*(or|and)\\s+['\"]?\\w+['\"]?\\s*=\\s*['\"]?\\w+ 에 맞음 — 따옴표로 값을 끊은 뒤 OR/AND 와 항상 참인 비교식을 붙임",
       "confidence": 0.9,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 조회 조건을 항상 참으로 바꿔 검사를 건너뛰는 SQL 주입 악용 형태"
     },
     {
       "name": "sql_quote_statement_break_in_argument",
       "signal": "sql_syntax",
-      "condition": "인자 문자열이 정규식 ['\"]\\s*;\\s*(select|insert|update|delete|drop)\\b 또는 ['\"][^&]*(--|/\\*) 에 맞음 — 따옴표로 값을 끊은 뒤 새 SQL 문을 잇거나 SQL 주석으로 뒤쪽 조건을 잘라 냄",
+      "condition": "요청 인자가 정규식 ['\"]\\s*;\\s*(select|insert|update|delete|drop)\\b 또는 ['\"][^&]*(--|/\\*) 에 맞음 — 따옴표로 값을 끊은 뒤 새 SQL 문을 잇거나 SQL 주석으로 뒤쪽 조건을 잘라 냄",
       "confidence": 0.9,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 조회문을 중간에서 끊고 공격자의 SQL 문으로 바꿔 치는 악용 형태"
     },
     {
       "name": "path_traversal_repeated_in_argument",
       "signal": "path_traversal",
-      "condition": "인자 문자열 안에 '../' 또는 '..\\' 가 2회 이상 나옴 — 웹 루트 밖으로 여러 단계 거슬러 올라가려는 경로",
+      "condition": "요청 인자 안에 '../' 또는 '..\\' 가 2회 이상 나옴 — 웹 루트 밖으로 여러 단계 거슬러 올라가려는 경로가 인자에 그대로 들어 있음",
       "confidence": 0.9,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 파일 경로 처리 약점으로 허용 폴더 밖 파일을 읽어 내는 악용 형태"
     },
     {
-      "name": "described_injection_repeated",
-      "signal": "described",
-      "condition": "설명 문장이 세 신호 중 하나를 말로 적었고(SQL 주입·SQL 구문·따옴표·스크립트 태그·스크립트 주입·XSS·경로 거슬러 올라가기·경로 탐색·'../' 등의 낱말), '아님'·'없음'·'정상' 같은 부정 표현이 없으며, 반복을 뜻하는 낱말(반복·연속·다수 등)이 있거나 \"8건\"처럼 2 이상의 횟수가 적혀 있거나 규칙 수준이 10 이상임 — 낱말 목록과 기준은 과제 문구에 맞춰 직접 정한 값",
+      "name": "escalated_rule_level",
+      "signal": "rule_level",
+      "condition": "규칙 수준이 10 이상 — 탐지 규칙이 웹 접근 경보를 이미 높은 위험도로 올려 보낸 경우(연습 경보에서 T1190 표시가 붙은 반복 주입은 모두 10 이상)",
       "confidence": 0.9,
-      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱에 같은 주입 형태를 되풀이해 밀어 넣는 악용 시도가 경보 설명에 이미 집계되어 적힌 경우"
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱을 노린 주입 시도가 탐지 규칙에서 높은 위험도로 집계된 경우"
     },
     {
-      "name": "ambiguous_described_injection_single",
-      "signal": "described",
-      "condition": "설명 문장이 세 신호 중 하나를 말로 적었고 부정 표현이 없지만, 반복 낱말도 2 이상의 횟수도 없고 규칙 수준이 10 미만임 — 주입 형태이긴 하나 한 번뿐이라 사람이 확인함",
+      "name": "repeated_injection_marker",
+      "signal": "marker",
+      "condition": "반복됨(5회 이상)이고 설명에 '표기'·'표식'·'구문'·'구분자'·'주입'·'삽입' 중 하나가 있음 — 종류를 특정하지 못해도 주입 표식이 되풀이됨",
+      "confidence": 0.88,
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱에 주입 표식을 도구로 대량 시도하는 악용 형태"
+    },
+    {
+      "name": "ambiguous_single_injection_like_marker",
+      "signal": "marker",
+      "condition": "규칙 수준이 5 이상이고 설명에 '주입'·'따옴표'·'구분 문자'·'이상한' 중 하나가 있지만 위 패턴에는 맞지 않음 — 주입처럼 보이나 반복이 없어 사람이 확인함",
       "confidence": 0.6,
-      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 입력 처리 약점을 한 번 떠본 것으로 경보 설명에 적힌 악용 준비 형태"
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱에 주입 약점이 있는지 한 번 떠보는 악용 준비 형태"
     },
     {
       "name": "ambiguous_lone_quote_in_argument",
       "signal": "sql_syntax",
-      "condition": "인자 문자열에 작은따옴표나 큰따옴표가 있지만 위 SQL 패턴 세 가지에는 맞지 않음 — 주입 가능 여부를 떠보는 것일 수도, 따옴표가 든 정상 이름·문장일 수도 있어 사람이 확인함",
+      "condition": "요청 인자에 작은따옴표나 큰따옴표가 있지만 SQL 인자 패턴 세 가지에는 맞지 않음 — 주입 가능 여부를 떠보는 것일 수도, 따옴표가 든 정상 이름·문장일 수도 있어 사람이 확인함",
       "confidence": 0.55,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱에 SQL 주입 약점이 있는지 따옴표로 떠보는 악용 준비 형태"
     },
     {
       "name": "ambiguous_single_path_traversal_in_argument",
       "signal": "path_traversal",
-      "condition": "인자 문자열 안에 '../' 또는 '..\\' 가 정확히 1회 나옴 — 반복이 아니라 상대 경로를 쓴 정상 요청일 수도 있어 사람이 확인함",
+      "condition": "요청 인자 안에 '../' 또는 '..\\' 가 정확히 1회 나옴 — 반복이 아니라 상대 경로를 쓴 정상 요청일 수도 있어 사람이 확인함",
       "confidence": 0.55,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 파일 경로 처리 약점을 한 단계 거슬러 올라가며 떠보는 악용 준비 형태"
+    },
+    {
+      "name": "ambiguous_mid_rule_level",
+      "signal": "rule_level",
+      "condition": "규칙 수준이 5 이상 10 미만이고 위 패턴에는 맞지 않음 — 탐지 규칙이 웹 접근을 주의 수준으로 올렸지만 공격이라 단정하기 어려워 사람이 확인함",
+      "confidence": 0.55,
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱을 노린 시도일 수 있다고 탐지 규칙이 표시했으나 반복·표식이 뚜렷하지 않은 경우"
     }
   ]
 }
