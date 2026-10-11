@@ -1,6 +1,6 @@
 {
   "schema": "xdr.web-injection.result.v1",
-  "generatedAt": "2026-10-11T11:20:43.113Z",
+  "generatedAt": "2026-10-11T11:40:00.345Z",
   "totalAlerts": 12,
   "loggedLinesThisRun": 12,
   "counts": {
@@ -16,7 +16,7 @@
   "blockRules": [
     {
       "sourceIp": "198.51.100.20",
-      "expiresAt": "2026-10-11T12:20:43.113Z",
+      "expiresAt": "2026-10-11T12:40:00.345Z",
       "basisAlertIds": [
         "ALERT-0005",
         "ALERT-0006"
@@ -24,7 +24,7 @@
     },
     {
       "sourceIp": "198.51.100.21",
-      "expiresAt": "2026-10-11T12:20:43.113Z",
+      "expiresAt": "2026-10-11T12:40:00.345Z",
       "basisAlertIds": [
         "ALERT-0007",
         "ALERT-0009"
@@ -54,7 +54,7 @@
       "sourceIp": "203.0.113.61",
       "action": "record",
       "confidence": 0,
-      "reason": "no_request_argument"
+      "reason": "no_pattern_matched"
     },
     {
       "alertId": "ALERT-0004",
@@ -62,7 +62,7 @@
       "sourceIp": "203.0.113.99",
       "action": "record",
       "confidence": 0,
-      "reason": "no_request_argument"
+      "reason": "no_pattern_matched"
     },
     {
       "alertId": "ALERT-0005",
@@ -109,16 +109,16 @@
       "time": "2026-10-10T03:00:00Z",
       "sourceIp": "203.0.113.70",
       "action": "alert",
-      "confidence": 0.55,
-      "reason": "ambiguous_lone_quote_in_argument"
+      "confidence": 0.6,
+      "reason": "ambiguous_described_injection_single"
     },
     {
       "alertId": "ALERT-0011",
       "time": "2026-10-10T03:05:00Z",
       "sourceIp": "203.0.113.71",
       "action": "alert",
-      "confidence": 0.55,
-      "reason": "ambiguous_single_path_traversal_in_argument"
+      "confidence": 0.6,
+      "reason": "ambiguous_described_injection_single"
     },
     {
       "alertId": "ALERT-0012",

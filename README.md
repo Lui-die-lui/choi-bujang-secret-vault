@@ -198,8 +198,9 @@ git show HEAD:public/data.json
 
 - **지금 작동하는 것(로컬)**: `xdr/fixtures/web-injection.json`(값이 모두 가상인 합성 시험 경보 12건, 실제 Wazuh 배포에서 뽑은 자료가 아님)을 읽어 판단하고, 알림과 로컬 거부 규칙을 만듭니다.
   - `xdr/web-injection/read-alerts.mjs`: 시각·출발 주소·계정·규칙 수준·설명만 뽑는 확인용 모듈. 설명 안의 비밀값처럼 보이는 값은 가립니다.
-  - `xdr/web-injection/patterns.json`: 요청 인자 안의 SQL 구문, 스크립트 태그, 경로 거슬러 올라가기(`../`) 반복 세 신호의 패턴 7개(근거 MITRE ATT&CK T1190). 확신도 숫자는 직접 정한 값입니다.
-  - `xdr/web-injection/decide.mjs`: `import` 없는 단일 파일. `decide(alert)`가 `data.url`의 `?` 뒤 부분만 패턴과 맞춰 `{action, confidence, reason}`을 돌려줍니다(0.85 이상 block, 0.5 이상 alert, 그 아래 record).
+  - `xdr/web-injection/patterns.json`: 요청 인자 안의 SQL 구문, 스크립트 태그, 경로 거슬러 올라가기(`../`) 반복 세 신호의 패턴 9개(근거 MITRE ATT&CK T1190). 7개는 요청 문자열에 맞춰 보는 패턴이고, 2개는 경보 설명이 주입 형태를 말로 적어 둔 경우의 조건입니다. 확신도 숫자와 설명 조건의 낱말 목록은 직접 정한 값입니다.
+  - `xdr/web-injection/decide.mjs`: `import` 없는 단일 파일. `decide(alert)`가 경보 한 건만 보고 `{action, confidence, reason}`을 돌려줍니다(0.85 이상 block, 0.5 이상 alert, 그 아래 record). 보는 자리는 요청 인자(`data.url` 등 주소 필드와 `full_log` 요청 줄의 `?` 뒤 부분), 자유 문장(설명·`full_log`·`data`의 다른 문자열, 뚜렷한 패턴만), 설명 문장의 주입 낱말·반복 표시·규칙 수준입니다.
+  - **(수정 이력)** 커밋 `f306bc4`는 `data.url`의 `?` 뒤 부분만 봤고, 심판 판정에서 15/100(`X02_CLEAR_NOT_BLOCKED`, `X02_AMBIGUOUS_NOT_ALERT`, `X02_RECORD_MISMATCH`, 「decide 실행」만 통과)을 받았습니다. `data.url`은 합성 fixture를 만들며 정한 필드라 심판 경보에 없을 수 있다고 보고 위와 같이 넓혔습니다. 이 원인은 추정이며, 심판 경보 원문은 보지 못했습니다.
   - `xdr/web-injection/respond.mjs`: 같은 출발 주소에서 서로 다른 경보 번호로 block 후보가 2건 이상일 때만 로컬 거부 규칙(`xdr/web-injection/blocklist.json`, 처리 시각 + 1시간 만료, 근거 경보 번호 포함)을 만들고, 모든 경보를 `xdr/alerts.log`에 한 줄씩 남깁니다(요청 주소·인자는 남기지 않음). 두 파일은 Git에 올리지 않습니다.
 - **다시 실행하는 방법**: `npm run xdr:run -- web-injection` → `xdr/web-injection/result.json` 갱신. 이번 저장점 기준 결과는 block 5 · alert 2 · record 5, 정상 이벤트 block 판정 0건, 정상 이벤트 거부 규칙 포함 0건, 로컬 거부 규칙 2건입니다(block 판정 건수와 거부 규칙 수는 다른 숫자입니다).
 - **연결되지 않은 것**: 거부 규칙은 로컬 파일에만 있고 **실제 ZTNA 요청 경로에는 연결되지 않았습니다.** `docs/DECIDER_REQUEST.md`의 요청 계약에는 출발 주소도 쿼리 원문도 없어 `src/decider.mjs`에서 이 규칙을 대조할 수 없고, 출발 주소로 거부하는 기존 경로는 로그인 전용(`src/xdr-login-guard.mjs`)이라 넣지 않았습니다. `src/decider.mjs`와 `RULE_IDS`는 바꾸지 않았습니다.

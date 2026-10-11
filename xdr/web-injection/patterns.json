@@ -1,6 +1,6 @@
 {
   "_notice": "웹 주입 시도의 알려진 형태를 정리한 목록입니다. 신호는 요청 인자 안의 SQL 구문, 스크립트 태그, 경로 거슬러 올라가기(../) 반복 세 가지로만 한정했습니다. 찾는 조건은 합성 시험 자료(xdr/fixtures/web-injection.json)의 모양을 기준으로 적은 것이며, 실제 Wazuh 경보 형식에서 요청 인자가 어느 필드에 담기는지는 확인하지 않았습니다. confidence 값은 제작 3의 block(0.85 이상)·alert(0.5 이상) 구분에 맞춰 직접 정한 값이고 외부 기준에서 가져온 값이 아닙니다. 순서는 확신도 내림차순입니다.",
-  "input": "검사 대상은 요청 인자 문자열입니다. 합성 시험 자료에서는 data.url의 첫 '?' 뒤 부분이며, 없으면 빈 문자열로 봅니다. 조건을 맞춰 보기 전에 '+'를 공백으로 바꾸고 퍼센트 인코딩을 한 번 풀고 소문자로 바꿉니다. 인자 문자열이 비어 있으면 어떤 패턴에도 맞지 않습니다.",
+  "input": "검사 대상은 요청 인자 문자열입니다. 합성 시험 자료에서는 data.url의 첫 '?' 뒤 부분이며, 없으면 빈 문자열로 봅니다. 조건을 맞춰 보기 전에 '+'를 공백으로 바꾸고 퍼센트 인코딩을 한 번 풀고 소문자로 바꿉니다. 인자 문자열이 비어 있으면 어떤 패턴에도 맞지 않습니다. (바로잡음 1, 심판 판정 X02_CLEAR_NOT_BLOCKED 이후) 요청 인자는 data.url 외에 data의 uri·path·request·query·args·params 필드와 full_log 요청 줄(\"GET 주소 HTTP/1.1\")의 주소에서도 꺼냅니다. 설명(rule.description)·full_log·data의 다른 문자열 값 같은 자유 문장에는 뚜렷한 패턴 다섯 가지만 맞춰 보되, 따옴표 뒤 주석 기호 조건과 애매한 패턴 두 가지는 정상 로그 줄에도 흔해 자유 문장에는 쓰지 않습니다. 자리마다 따로 맞춰 본 뒤 가장 확신도 높은 패턴 하나를 씁니다. 심판 경보의 실제 형식은 확인하지 못했습니다.",
   "patterns": [
     {
       "name": "sql_union_select_in_argument",
@@ -36,6 +36,20 @@
       "condition": "인자 문자열 안에 '../' 또는 '..\\' 가 2회 이상 나옴 — 웹 루트 밖으로 여러 단계 거슬러 올라가려는 경로",
       "confidence": 0.9,
       "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 파일 경로 처리 약점으로 허용 폴더 밖 파일을 읽어 내는 악용 형태"
+    },
+    {
+      "name": "described_injection_repeated",
+      "signal": "described",
+      "condition": "설명 문장이 세 신호 중 하나를 말로 적었고(SQL 주입·SQL 구문·따옴표·스크립트 태그·스크립트 주입·XSS·경로 거슬러 올라가기·경로 탐색·'../' 등의 낱말), '아님'·'없음'·'정상' 같은 부정 표현이 없으며, 반복을 뜻하는 낱말(반복·연속·다수 등)이 있거나 \"8건\"처럼 2 이상의 횟수가 적혀 있거나 규칙 수준이 10 이상임 — 낱말 목록과 기준은 과제 문구에 맞춰 직접 정한 값",
+      "confidence": 0.9,
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱에 같은 주입 형태를 되풀이해 밀어 넣는 악용 시도가 경보 설명에 이미 집계되어 적힌 경우"
+    },
+    {
+      "name": "ambiguous_described_injection_single",
+      "signal": "described",
+      "condition": "설명 문장이 세 신호 중 하나를 말로 적었고 부정 표현이 없지만, 반복 낱말도 2 이상의 횟수도 없고 규칙 수준이 10 미만임 — 주입 형태이긴 하나 한 번뿐이라 사람이 확인함",
+      "confidence": 0.6,
+      "reference": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/) — 공개 웹 앱의 입력 처리 약점을 한 번 떠본 것으로 경보 설명에 적힌 악용 준비 형태"
     },
     {
       "name": "ambiguous_lone_quote_in_argument",
