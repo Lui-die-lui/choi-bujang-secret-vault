@@ -164,7 +164,7 @@
     "alert": 9,
     "record": 9
   },
-  "generatedAt": "2026-10-11T11:50:07.220Z",
+  "generatedAt": "2026-10-11T11:58:38.065Z",
   "totalAlerts": 26,
   "loggedLinesThisRun": 26,
   "falsePositiveCount": 0,
@@ -176,7 +176,7 @@
   "blockRules": [
     {
       "sourceIp": "203.0.113.10",
-      "expiresAt": "2026-10-11T12:50:07.220Z",
+      "expiresAt": "2026-10-11T12:58:38.065Z",
       "basisAlertIds": [
         "wi-01",
         "wi-02"

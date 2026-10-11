@@ -1,0 +1,12 @@
+[
+  {
+    "sourceIp": "203.0.113.10",
+    "expiresAtMs": 1791723518065,
+    "reason": "repeated_sql_marker",
+    "basisAlertIds": [
+      "wi-01",
+      "wi-02"
+    ],
+    "createdAtMs": 1791719917467
+  }
+]

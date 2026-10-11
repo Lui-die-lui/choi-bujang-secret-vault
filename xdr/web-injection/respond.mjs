@@ -12,7 +12,7 @@
 // (docs/DECIDER_REQUEST.md)에는 출발 주소도 쿼리 원문도 없어 이 규칙을 대조할 수 없고,
 // 출발 주소로 거부하는 기존 경로는 로그인 전용(src/xdr-login-guard.mjs)뿐이라 웹 주입
 // 규칙을 거기에 넣지 않았습니다. 판정기 규칙(RULE_IDS)도 건드리지 않습니다.
-import { appendFileSync, existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decide } from './decide.mjs';
@@ -44,6 +44,15 @@ function loadGroups(expectedPath) {
 // 만들어지자마자 만료되기 때문입니다.
 const BLOCK_DURATION_SECONDS = 3600;
 const MIN_DISTINCT_BLOCK_ALERTS = 2;
+
+const LOG_MODULE = 'web-injection';
+function isOwnLogLine(line) {
+  try {
+    return JSON.parse(line)?.module === LOG_MODULE;
+  } catch {
+    return false;
+  }
+}
 
 // 경보 한 건을 판단해 알림·규칙에 쓸 항목만 남깁니다. 요청 주소(data.url)와 인자는
 // decide()에만 넘기고 여기서는 꺼내 담지 않습니다.
@@ -110,19 +119,22 @@ export function respond({
   saveBlocklist(blocklistPath, blocklist);
 
   const ruleSourceIps = new Set(candidates.map((candidate) => candidate.sourceIp));
-  for (const item of judged) {
-    const logLine = JSON.stringify({
-      module: 'web-injection',
-      time: item.time,
-      sourceIp: item.sourceIp,
-      action: item.action,
-      confidence: item.confidence,
-      reason: item.reason,
-      basisAlertId: item.alertId,
-      denyRule: item.action === 'block' && ruleSourceIps.has(item.sourceIp),
-    });
-    appendFileSync(logPath, `${logLine}\n`, 'utf8');
-  }
+  const logLines = judged.map((item) => JSON.stringify({
+    module: LOG_MODULE,
+    time: item.time,
+    sourceIp: item.sourceIp,
+    action: item.action,
+    confidence: item.confidence,
+    reason: item.reason,
+    basisAlertId: item.alertId,
+    denyRule: item.action === 'block' && ruleSourceIps.has(item.sourceIp),
+  }));
+  // 알림 기록은 다른 모듈과 함께 쓰는 파일입니다. 이 모듈이 전에 남긴 줄만 이번 실행의
+  // 줄로 바꾸고 다른 모듈의 줄은 그대로 둡니다(다시 실행해도 같은 경보가 겹쳐 쌓이지 않게).
+  const otherLines = existsSync(logPath)
+    ? readFileSync(logPath, 'utf8').split(/\r?\n/u).filter((line) => line !== '' && !isOwnLogLine(line))
+    : [];
+  writeFileSync(logPath, `${[...otherLines, ...logLines].join('\n')}\n`, 'utf8');
 
   return {
     totalAlerts: raw.alerts.length,

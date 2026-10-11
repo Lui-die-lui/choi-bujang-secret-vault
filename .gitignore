@@ -7,5 +7,3 @@ public/aleph.json
 *.local.sql
 CHECK.md
 xdr/brute-force/blocklist.json
-xdr/alerts.log
-xdr/web-injection/blocklist.json

@@ -200,7 +200,7 @@ git show HEAD:public/data.json
   - `xdr/web-injection/read-alerts.mjs`: 시각·출발 주소·계정·규칙 수준·설명만 뽑는 확인용 모듈. 설명 안의 비밀값처럼 보이는 값은 가립니다.
   - `xdr/web-injection/patterns.json`: 패턴 14개(근거 MITRE ATT&CK T1190). 반복 횟수(5회 이상)와 설명 낱말로 보는 SQL 구문·스크립트·경로 거슬러 올라가기·주입 표식 반복, 규칙 수준(10 이상은 명확, 5 이상 10 미만은 애매), 요청 인자에 주입 구문이 그대로 들어온 경우의 조건입니다. 기준 숫자·낱말 목록·확신도는 연습 경보를 보고 직접 정한 값이며 심판의 정답표에서 가져온 값이 아닙니다.
   - `xdr/web-injection/decide.mjs`: `import` 없는 단일 파일. `decide(alert)`가 경보 한 건의 규칙 수준(`rule.level`)·반복 횟수(`data.count`)·설명(`rule.description`)·요청 인자(`data.url`의 `?` 뒤)를 보고 `{action, confidence, reason}`을 돌려줍니다(0.85 이상 block, 0.5 이상 alert, 그 아래 record).
-  - `xdr/web-injection/respond.mjs`: 같은 출발 주소에서 서로 다른 경보 번호로 block 후보가 2건 이상일 때만 로컬 거부 규칙(`xdr/web-injection/blocklist.json`, 처리 시각 + 1시간 만료, 근거 경보 번호 포함)을 만들고, 모든 경보를 `xdr/alerts.log`에 한 줄씩 남깁니다(요청 주소·인자는 남기지 않음). 두 파일은 Git에 올리지 않습니다.
+  - `xdr/web-injection/respond.mjs`: 같은 출발 주소에서 서로 다른 경보 번호로 block 후보가 2건 이상일 때만 로컬 거부 규칙(`xdr/web-injection/blocklist.json`, 처리 시각 + 1시간 만료, 근거 경보 번호 포함)을 만들고, 모든 경보를 `xdr/alerts.log`에 한 줄씩 남깁니다(요청 주소·인자는 남기지 않음). 다시 실행하면 이 모듈이 전에 남긴 알림 줄만 이번 실행의 줄로 바뀝니다. 두 파일은 산출물로 Git에 올립니다(문서용 주소·경보 번호·패턴 이름만 들어 있음). 다시 실행하면 규칙의 만료 시각이 바뀌어 `blocklist.json`이 변경으로 잡힙니다.
   - `xdr/fixtures/web-injection.expected.json`: 연습 경보를 읽고 직접 붙인 묶음 표시(명확 8·애매 9·정상 9). 실행 뒤 확인에만 쓰며 심판의 정답표가 아닙니다.
 - **다시 실행하는 방법**: `npm run xdr:run -- web-injection` → `xdr/web-injection/result.json` 갱신(`schema`·`moduleKey`·`decisions`·`counts`는 운영 측 실행기의 `aleph.xdr.result.v1` 모양). 현재 결과는 block 8 · alert 9 · record 9, 정상 이벤트 block 판정 0건, 정상 이벤트 거부 규칙 포함 0건, 로컬 거부 규칙 1건입니다(block 판정 건수와 거부 규칙 수는 다른 숫자입니다).
 - **(수정 이력) 심판 판정 15/100을 두 번 받은 까닭**:
