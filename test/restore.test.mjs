@@ -11,7 +11,7 @@ const NOTE_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const NOTE_B2 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 // ---- 인메모리 저장소와 로그인 대역 ----
-const tables = { t03_personal_notes: [], t10_note_backups: [] };
+const tables = { t03_personal_notes: [], t10_note_backups: [], t10_restore_audit: [] };
 let failTable = null; // 이 표의 다음 요청을 DB 오류로 만든다
 let beforeBackupRead = null;
 let backupReads = 0;
@@ -31,7 +31,7 @@ function query(table) {
     const hit = source.filter(r => filters.every(([k, v]) => r[k] === v));
     if (op === 'insert') {
       const key = table === 't10_note_backups' ? 'note_id' : 'id';
-      if (source.some(r => r[key] === patch[key])) return { data: null, error: { message: 'duplicate key' } };
+      if (table !== 't10_restore_audit' && source.some(r => r[key] === patch[key])) return { data: null, error: { message: 'duplicate key' } };
       source.push({ ...patch });
       return { data: single ? { ...patch } : [{ ...patch }], error: null };
     }
@@ -94,6 +94,8 @@ function reset() {
     note(NOTE_B2, B, 'B 둘째 제목', 'B 둘째 본문')];
   tables.t10_note_backups = tables.t03_personal_notes
     .map(r => backupRow({ id: r.id, ownerId: r.owner_id, title: r.title, content: r.content }));
+  // 전부터 있던 감사 기록 한 줄: 복원 뒤에도 그대로 남아 있어야 한다
+  tables.t10_restore_audit = [{ note_id: NOTE_A, owner_id: A, outcome: 'restored', reason: 'earlier_record' }];
 }
 const row = id => tables.t03_personal_notes.find(r => r.id === id);
 const others = id => JSON.stringify(tables.t03_personal_notes.filter(r => r.id !== id));
@@ -116,7 +118,8 @@ test('복원: 변조된 B의 메모 한 건이 사본과 같은 ID·소유자·�
   const out = await call(restore, { token: 'token-b', query: { id: NOTE_B } });
   assert.equal(out.status, 200);
   assert.deepEqual(out.body, { id: NOTE_B, restored: true, backupVerified: true,
-    backupVersion: { createdAt: null, contentSha256: expected }, changes: ['title', 'body'], contentSha256: expected });
+    backupVersion: { createdAt: null, contentSha256: expected }, changes: ['title', 'body'], contentSha256: expected,
+    auditRecorded: true });
   assert.deepEqual(row(NOTE_B), note(NOTE_B, B, 'B 제목', 'B 본문'));
   assert.equal(contentHash(row(NOTE_B).title, row(NOTE_B).content), expected);
   assert.equal(others(NOTE_B), before); // 다른 메모·다른 계정 자료는 그대로
@@ -288,5 +291,55 @@ test('복원: 본문의 id가 경로의 ID와 다르면 중단하고, 같으면 
   // 이미 사본과 같은 메모를 다시 복원하면 바뀔 항목이 없다
   const again = await call(restore, { token: 'token-b', query: { id: NOTE_B } });
   assert.deepEqual([again.status, again.body.changes], [200, []]);
+  logs.done();
+});
+
+test('감사 기록: 복원 시도마다 덧붙이기만 하고, 전부터 있던 기록·다른 메모는 그대로다', async () => {
+  reset();
+  const logs = quiet();
+  const earlier = JSON.stringify(tables.t10_restore_audit[0]);
+  const audit = () => tables.t10_restore_audit;
+  const hash = contentHash('B 제목', 'B 본문');
+
+  // 미리보기는 감사 기록을 포함해 아무것도 쓰지 않는다
+  row(NOTE_B).content = '변조 본문';
+  await call(restore, { method: 'GET', token: 'token-b', query: { id: NOTE_B } });
+  assert.equal(audit().length, 1);
+
+  // 성공한 복원: 쓰기 전 한 줄, 결과 한 줄
+  const before = contentHash('B 제목', '변조 본문');
+  const otherNotes = others(NOTE_B);
+  assert.equal((await call(restore, { token: 'token-b', query: { id: NOTE_B } })).status, 200);
+  assert.deepEqual(audit().slice(1), [
+    { note_id: NOTE_B, owner_id: B, outcome: 'restore_started', backup_sha256: hash, before_sha256: before },
+    { note_id: NOTE_B, owner_id: B, outcome: 'restored', backup_sha256: hash, before_sha256: before, after_sha256: hash },
+  ]);
+  assert.equal(others(NOTE_B), otherNotes);
+
+  // 멈춘 복원(사본 검증 실패, 남의 메모)도 한 줄씩 남는다
+  tables.t10_note_backups.find(r => r.note_id === NOTE_B2).content_sha256 = '0'.repeat(64);
+  assert.equal((await call(restore, { token: 'token-b', query: { id: NOTE_B2 } })).status, 409);
+  assert.equal((await call(restore, { token: 'token-b', query: { id: NOTE_A } })).status, 404);
+  assert.deepEqual(audit().slice(3), [
+    { note_id: NOTE_B2, owner_id: B, outcome: 'backup_verification_failed', reason: 'hash_mismatch' },
+    { note_id: NOTE_A, owner_id: B, outcome: 'backup_not_found', reason: 'backup_not_found' },
+  ]);
+
+  // 전부터 있던 기록은 그대로이고, 감사 기록에 제목·본문은 없다
+  assert.equal(JSON.stringify(audit()[0]), earlier);
+  assert.doesNotMatch(JSON.stringify(audit()), /B 본문|B 제목|변조/u);
+  logs.done();
+});
+
+test('감사 기록을 남기지 못하면 복원하지 않는다', async () => {
+  reset();
+  const logs = quiet();
+  row(NOTE_B).content = '변조 본문';
+  const snapshot = JSON.stringify(tables.t03_personal_notes);
+  failTable = 't10_restore_audit';
+  const out = await call(restore, { token: 'token-b', query: { id: NOTE_B } });
+  assert.equal(out.status, 500);
+  assert.deepEqual(out.body, { error: 'restore_audit_failed' });
+  assert.equal(JSON.stringify(tables.t03_personal_notes), snapshot);
   logs.done();
 });

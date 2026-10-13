@@ -4,6 +4,7 @@ import { BACKUP_TABLE, contentHash, verifyBackup } from '../../src/note-backup.m
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
 
 const TABLE = 't03_personal_notes';
+const AUDIT_TABLE = 't10_restore_audit';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 const fingerprint = userId => createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
@@ -54,11 +55,25 @@ function planOf(copy, current) {
   return { backupVersion: { createdAt: copy.created_at ?? null, contentSha256: copy.content_sha256 }, changes };
 }
 
+// 감사 기록: 복원(POST) 시도를 결과와 상관없이 한 줄씩 덧붙입니다. 고치거나 지우지 않습니다.
+// 메모 제목·본문은 담지 않고 ID·결과·내용 해시만 남깁니다. 반환: 기록했으면 true.
+async function appendAudit(supabase, row) {
+  try {
+    const { error } = await supabase.from(AUDIT_TABLE).insert(row);
+    if (error) console.error('note-restore audit failed:', error.message);
+    return !error;
+  } catch {
+    console.error('note-restore audit failed: unexpected_error');
+    return false;
+  }
+}
+
 // 10단계: 비공개 사본에서 지정한 메모 한 건만 되살립니다.
 //   GET  /api/note-restore/:id  미리보기 — 사본을 읽어 검증하고, 복원할 사본 버전과 바뀔 항목만
 //                               보여 줍니다. 아무것도 쓰지 않습니다.
 //   POST /api/note-restore/:id  복원 — 같은 미리보기를 만든 뒤, 쓰기 직전에 사본을 다시 읽어
-//                               검증하고 그 한 행만 되돌립니다.
+//                               검증하고 그 한 행만 되돌립니다. 시도마다 감사 기록을 덧붙이며,
+//                               쓰기 전에 감사 기록을 남기지 못하면 복원하지 않습니다.
 // 로그인은 다른 자료 API와 같은 verifyRequestLogin으로 확인합니다. 요청 본문의 id는 경로의 ID와
 // 같은지만 보고, 그 밖의 본문 값(소유자·내용 등)은 읽지 않습니다. 사본이 없거나 메모 ID·소유자·
 // 내용 해시가 하나라도 맞지 않으면 아무것도 바꾸지 않고 중단합니다. 바꾸는 것은 검증된 사용자
@@ -95,8 +110,13 @@ export default async function handler(request, response) {
     identity: identity.identity ?? null, uid: fingerprint(identity.userId), resource: `note:${id}`,
     ...extra, request: shape,
   }));
-  const stopWith = ({ status, error, reason }) => {
-    log(error === 'not_found' ? 'backup_not_found' : error, { reason });
+  const audit = extra => ({ note_id: id, owner_id: identity.userId, ...extra });
+  let supabase = null;
+  const stopWith = async ({ status, error, reason }) => {
+    const outcome = error === 'not_found' ? 'backup_not_found' : error;
+    log(outcome, { reason });
+    // 멈춘 복원 시도도 감사 기록에 남깁니다(미리보기는 아무것도 쓰지 않음).
+    if (!preview && supabase) await appendAudit(supabase, audit({ outcome, reason }));
     return response.status(status).json({ error });
   };
 
@@ -106,7 +126,7 @@ export default async function handler(request, response) {
     return stopWith({ status: 400, error: 'invalid_id', reason: 'body_id_mismatch' });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseSecretKey, {
+  supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
 
@@ -144,7 +164,15 @@ export default async function handler(request, response) {
     return stopWith({ status: 409, error: 'backup_verification_failed', reason: 'backup_changed' });
   }
 
-  // 5) 그 한 행만 되돌립니다: 있으면 내용만 고치고, 지워졌으면 같은 ID·소유자로 다시 넣습니다.
+  // 5) 쓰기 전에 감사 기록을 먼저 덧붙입니다. 남기지 못하면 복원하지 않습니다.
+  const hashes = { backup_sha256: copy.content_sha256,
+    before_sha256: current ? contentHash(current.title, current.content) : null };
+  if (!await appendAudit(supabase, audit({ outcome: 'restore_started', ...hashes }))) {
+    log('restore_audit_failed');
+    return response.status(500).json({ error: 'restore_audit_failed' });
+  }
+
+  // 6) 그 한 행만 되돌립니다: 있으면 내용만 고치고, 지워졌으면 같은 ID·소유자로 다시 넣습니다.
   const action = current ? 'updated' : 'inserted';
   const { error: writeError } = current
     ? await supabase.from(TABLE).update({ title: copy.title, content: copy.content })
@@ -156,7 +184,7 @@ export default async function handler(request, response) {
     return stopWith({ status: 500, error: 'notes_write_failed', reason: 'db_error' });
   }
 
-  // 6) 되살린 행을 다시 읽어 사본과 같은지 확인합니다.
+  // 7) 되살린 행을 다시 읽어 사본과 같은지 확인합니다.
   const { data: restored, error: checkError } = await supabase
     .from(TABLE).select('id, owner_id, title, content')
     .eq('id', id).eq('owner_id', identity.userId).maybeSingle();
@@ -165,7 +193,14 @@ export default async function handler(request, response) {
     return stopWith({ status: 500, error: 'restore_verification_failed', reason: 'readback_mismatch' });
   }
 
+  // 8) 결과를 감사 기록에 덧붙입니다. 남기지 못하면 성공으로 답하지 않습니다.
+  if (!await appendAudit(supabase, audit({ outcome: 'restored', ...hashes,
+    after_sha256: contentHash(restored.title, restored.content) }))) {
+    log('restore_audit_failed', { action });
+    return response.status(500).json({ error: 'restore_audit_failed' });
+  }
+
   log('restored', { action, changes: plan.changes });
   return response.status(200).json({ id, restored: true, backupVerified: true, ...plan,
-    contentSha256: copy.content_sha256 });
+    contentSha256: copy.content_sha256, auditRecorded: true });
 }
