@@ -13,7 +13,9 @@ export async function runAttackChecks(config) {
   // api/*.mjs 어디서도 decide()를 부르지 않아(이전 단계부터 동일), 실제 HTTP
   // 요청으로 새로 점검할 길이 없습니다. 5단계부터의 보호(로그인·소유자·직접
   // 접근 차단)는 이번 단계에서 안 바뀌었으니 같은 점검을 그대로 재사용합니다.
-  if (![5, 6].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  // 7단계: 복합 이상 접속 규칙(step_up_required)도 같은 이유로 실제 HTTP로 점검할
+  // 길이 없어 가상 사건 연습(npm run decider:test, fixture:7)으로만 확인합니다.
+  if (![5, 6, 7].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);

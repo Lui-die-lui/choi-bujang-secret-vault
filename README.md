@@ -2,7 +2,7 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 지금 작동하는 기능 (6단계 저장점)
+## 지금 작동하는 기능 (7단계 저장점)
 
 - 화면(`/`)에서 이메일·비밀번호로 로그인/로그아웃할 수 있습니다. 로그인·세션 갱신·로그아웃은 전부 서버 함수(`/api/auth/login`·`/api/auth/refresh`·`/api/auth/logout`)가 공식 Supabase SDK로 처리하며, **화면 코드에는 Supabase 프로젝트 URL이나 공개 키가 전혀 없습니다.**
 - 로그인해야만 `/api/notes`(2단계 공개 가상 메모 4건, `t02_vault_notes`, 소유자 없는 공용 자료)가 보입니다. 로그아웃하면 화면의 메모도 바로 지워집니다.
@@ -11,6 +11,7 @@
 - 모든 자료 API는 `src/verify-login.mjs`(미수정)로 `Authorization: Bearer <토큰>`을 검증합니다. 토큰이 없거나 검증 실패 시 메모 없이 401 JSON 오류를 돌려줍니다.
 - `data.json`, `public/data.json`에는 메모가 없습니다(`"notes": []`).
 - **6단계**: `src/decider.mjs`(ALEPH SDP 엔진이 호출하는 ZTNA 판정기)가 "자료실 읽기" 요청(`service: 'notes'`, `method: 'GET'`)에 기기 등록 조건을 겁니다 — `deviceRegistered`가 명시적으로 `true`일 때만 `allow`, 그 외(미등록·값 없음)는 `deny`+`device_not_registered`로 거부합니다. 아래 "6단계: 등록한 기기만 자료실에 들어옵니다" 절 참고.
+- **7단계**: 같은 판정기가 "평소와 다른 시각 + 처음 보는 네트워크 + 갑작스러운 대량 자료 읽기"가 겹친 가상 접속 사건을 `step_up`(추가 확인)으로 보냅니다. 아래 "7단계" 절 참고. 실제 자료 차단·재로그인 후 허용은 **미실행**입니다.
 - **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
 - **남은 약점**: `/api/notes`(공용 자료)는 로그인만 확인하고 소유자 개념이 없습니다(의도된 설계, 아래 4단계 절 참고). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
@@ -103,6 +104,27 @@ git show HEAD:public/data.json
 - 이 연습은 AGENTS.md·문서 원문이 명시한 대로 **가상 요청 연습이며 실제 심판 판정이 아닙니다.**
 
 **남은 것**: `step_up`(복합 이상 접속 재인증) 규칙은 7단계 범위라 이번에는 추가하지 않았습니다. 실제로 `npm run fixture:7`을 실행해 확인한 결과: `정상 사건: allow / 복합 이상 사건: allow`로 나와 "복합 이상 사건은 step_up이어야 합니다" 오류로 실패합니다 — "자료실 읽기 + 기기 등록"만 보는 지금 규칙은 복합 이상 신호(`recentEvents`)를 전혀 안 보기 때문입니다. `npm run fixture:7`은 6단계 제출 조건에 없고(CHECK.md는 `decider:test`만 요구) 7단계의 연습 스크립트라, 지금 실패하는 건 범위 밖이며 예상된 상태입니다.
+
+## 7단계: 평소와 다른 접속은 다시 확인합니다
+
+**입력 출처**: `docs/DECIDER_REQUEST.md` 계약의 `request.signals`(`source,region,network,hour`), `request.recentEvents`(`{kind,ageSeconds,count}` 최대 12건), `request.stepUp`(`{verified,authAgeSeconds}`)만 씁니다. 모두 반 엔진이 만들어 넘긴 요청 필드이며, 브라우저 헤더·위치는 읽지 않고 계약에 없는 필드도 만들지 않았습니다. 실제 경로는 `source:"none"`·`region/network:"unknown"`이라 시각·네트워크를 알 수 없고, 가상 사건만 `source:"judge_fixture"`로 옵니다.
+
+**규칙 `step_up_required`** (`src/decider.mjs`, `RULE_IDS`에 추가). `GET notes` 요청에서 순서대로:
+1. `deviceRegistered !== true` 또는 `subjectId` 없음 → `deny` / `device_not_registered` (6단계 그대로, 항상 먼저. 추가 인증이 이걸 우회하지 못함)
+2. `signals.source === 'judge_fixture'`이고 **세 조건이 모두** 참 → 시각 0~5시 또는 23시, `network === 'unusual'`, 최근 600초 안 `risk_signal` 사건 건수 합계 10 이상 → 추가 인증이 없으면 `step_up` / `step_up_required`, 엔진이 검증한 `stepUp.verified === true`이고 `authAgeSeconds`가 0~900 정수면 `allow` / `approved`
+3. 그 외 → `allow` / `approved`
+
+- 가상 출처인데 `hour`·`recentEvents` 모양이 계약과 다르면(위조·결손) 정상으로 채우지 않고 `step_up` 처리합니다. 출처가 `none`이거나 다른 값이면 시각·네트워크를 알 수 없어 이 규칙은 판단을 보류하고 기존 6단계 규칙만 적용합니다(정상값으로 채우지 않음).
+- 시각 구간(0~5, 23시)과 대량 기준(10건/10분)은 계약에 값이 없어 제가 정한 가정입니다. 제공 fixture(3시·`unusual`·20건)와 정상(14시·`usual`·0건)만 근거입니다.
+- **지역만 바뀐 경우**는 제공 시험이 요구하는 판정이 없어 이번 규칙에 넣지 않았습니다(`deny`로 막지 않고 6단계 규칙대로 `allow`). 필요하면 별도로 정해야 합니다.
+
+**시험 결과(실제 실행, 가상 요청 연습이며 심판 판정이 아님)**:
+- `npm run decider:test`: 통과 4건(등록 기기 정상 allow / 미등록 기기 deny `device_not_registered` / 복합 이상 `step_up` `step_up_required` / 재인증 확인 후 allow).
+- `npm run fixture:7`: `정상 사건: allow`, `복합 이상 사건: step_up`.
+- `npm run test:r5`: 2 pass / 0 fail. (`npm run decider`라는 명령은 package.json에 없습니다.)
+- 추가 직접 확인: 미등록 기기+재인증 → `deny`, `stepUp.authAgeSeconds` 5000 또는 `verified:"true"`(문자열) → 여전히 `step_up`, 신호 하나만 이상(시각/네트워크/지역/대량 읽기 각각) → `allow`, 출처 `none`·`client_header` → 기존 규칙(`allow`).
+
+**실제 재로그인 계약**: `stepUp`(엔진이 검증한 추가 인증 여부와 인증 나이)이 계약에 있어 그 값만 사용합니다. 그러나 이 저장소의 `api/*.mjs`는 `decide()`를 호출하지 않고 반 엔진·심판 환경이 이 판정기를 호출하므로, **실제 자료 차단과 새 로그인 후 허용은 이 세션에서 실행하지 못했습니다(미실행).** 위 결과는 가상 판정 시험일 뿐 실제 접근 차단 성공의 증거가 아닙니다.
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
 
