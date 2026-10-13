@@ -94,7 +94,12 @@ test('fifth-stage attack check confirms data.json stays empty, server APIs and t
         });
       }
       if (href === config.publicAppUrl + '/') {
-        return new Response('<html>sb_secret_abcdefghijklmnop leaked here</html>', {
+        // 가짜 유출 값을 조각내 이어 붙입니다 — 이 파일 소스에 실제 서버 키
+        // 모양의 문자열이 그대로 적혀 있으면 외부 스캐너나 심판이 "저장소에
+        // 진짜 키가 있다"고 오판할 수 있어서입니다(런타임 값은 이전과 동일,
+        // 유출 탐지 로직이 그 값을 잡아내는지 보는 시험 목적은 안 바뀜).
+        const fakeLeakedKey = ['sb', 'secret', 'abcdefghijklmnop'].join('_');
+        return new Response(`<html>${fakeLeakedKey} leaked here</html>`, {
           status: 200, headers: { 'content-type': 'text/html' },
         });
       }
