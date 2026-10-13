@@ -39,13 +39,14 @@
       border-radius: 8px; border: 1px solid #51667c; background: #101a28; color: #ecf4ff; font-size: 15px;
       font-family: inherit; box-sizing: border-box; }
     .my-notes textarea { min-height: 70px; resize: vertical; }
-    .my-notes > form > button[type="submit"] { display: block; margin-left: auto; }
+    .my-notes > form > button[type="submit"] { display: block; margin-left: auto; padding: 10px 18px;
+      border-radius: 8px; border: none; background: #8ad8df; color: #101a28; font-weight: 700; cursor: pointer; }
     #my-notes-list li { display: grid; gap: 10px; }
     #my-notes-list .note-actions { display: flex; gap: 8px; justify-content: flex-end; }
     .device { margin: 26px 0; padding: 18px; border: 1px solid #51667c; border-radius: 14px; background: #1a2a3d; }
     .device h2 { font-size: 20px; margin: 0 0 8px; }
     .device p { margin: 6px 0; font-size: 15px; }
-    .device .device-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .device .device-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 12px; }
     .device button { padding: 10px 18px; border-radius: 8px; border: none; background: #8ad8df; color: #101a28;
       font-weight: 700; cursor: pointer; }
     .device button[disabled] { opacity: .5; cursor: default; }
