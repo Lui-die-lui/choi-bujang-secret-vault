@@ -1,0 +1,8 @@
+{
+  "schema": "choi-vault.test-policy.manifest.v1",
+  "backupFile": "policy/safe-policy.json",
+  "revision": 8,
+  "verifiedAt": "2026-10-13T15:37:34+09:00",
+  "sha256": "07002828e45912c987ac1a42c42f46541feec85e906261fbe0dce1899e51ea16",
+  "note": "안전 정책 사본의 버전과 SHA-256(줄바꿈을 LF로 맞춘 내용)을 사본 파일과 따로 적어 둔 기록입니다."
+}

@@ -14,6 +14,7 @@
     "policy:diff": "node scripts/policy-restore.mjs",
     "policy:restore": "node scripts/policy-restore.mjs",
     "test:restore": "node --experimental-test-module-mocks --test test/restore.test.mjs",
+    "test:policy": "node --test test/policy-restore.test.mjs",
     "xdr:run": "node xdr/run.mjs",
     "xdr:sync": "node xdr/sync.mjs"
   },

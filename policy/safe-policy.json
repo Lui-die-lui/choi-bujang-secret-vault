@@ -1,0 +1,22 @@
+{
+  "schema": "choi-vault.test-policy.v1",
+  "revision": 8,
+  "verifiedAt": "2026-10-13T15:37:34+09:00",
+  "note": "침해 전에 검증한 안전 정책 사본입니다(8단계 저장점 6666eeb 기준의 가상 시험 정책). 운영 판정기 src/decider.mjs가 아닙니다.",
+  "services": {
+    "notes": {
+      "ownerOnly": true,
+      "listAll": false,
+      "methods": ["GET", "PUT"]
+    },
+    "announcements": {
+      "write": false
+    },
+    "devices": {
+      "registeredOnly": true
+    },
+    "stepUp": {
+      "compositeAnomaly": true
+    }
+  }
+}

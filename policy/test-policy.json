@@ -1,0 +1,59 @@
+{
+  "schema": "choi-vault.test-policy.v1",
+  "revision": 10,
+  "note": "가상 시험 정책입니다. 운영 판정기 src/decider.mjs가 아니며, 이 파일을 바꿔도 실제 판정은 바뀌지 않습니다.",
+  "services": {
+    "notes": {
+      "ownerOnly": true,
+      "listAll": false,
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    "announcements": {
+      "write": false
+    },
+    "devices": {
+      "registeredOnly": true
+    },
+    "stepUp": {
+      "compositeAnomaly": true
+    },
+    "detect": {
+      "burstReadLimit": 120,
+      "windowMinutes": 10
+    },
+    "noteRestore": {
+      "ownerOnly": true,
+      "verifyBackup": true
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-10-13T15:37:34+09:00",
+      "action": "policy_verified",
+      "toRevision": 8,
+      "note": "8단계 저장점 6666eeb 기준으로 검증"
+    },
+    {
+      "at": "2026-10-13T15:47:35+09:00",
+      "action": "service_added",
+      "service": "detect",
+      "toRevision": 9,
+      "note": "9단계 저장점 781f99c"
+    },
+    {
+      "at": "2026-10-13T10:37:31.101Z",
+      "action": "policy_restored",
+      "service": "notes",
+      "toRevision": 8,
+      "backupSha256": "07002828e45912c987ac1a42c42f46541feec85e906261fbe0dce1899e51ea16",
+      "changedKeys": [
+        "ownerOnly",
+        "listAll",
+        "methods"
+      ]
+    }
+  ]
+}

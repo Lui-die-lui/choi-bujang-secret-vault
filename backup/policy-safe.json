@@ -1,7 +1,0 @@
-{
-  "schema": "choi-vault.policy-backup.v1",
-  "policyFile": "src/decider.mjs",
-  "version": "6666eeb6ece68bfbe16386569dbcf0df1fcf5123",
-  "sha256": "4763b2cf4c158088684cc9a4d2051573ad7dc6f75474088dcc0d0bb92b044794",
-  "note": "8단계 저장점 커밋의 판정기. 줄바꿈을 LF로 맞춘 내용의 SHA-256입니다."
-}
