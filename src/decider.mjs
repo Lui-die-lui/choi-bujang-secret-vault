@@ -12,8 +12,13 @@
 // request.recentEvents, request.stepUp뿐입니다. 이 값들은 브라우저 헤더가 아니라
 // 엔진이 만들어 넘긴 요청 필드이며, 모양이 계약과 맞지 않으면 믿지 않습니다.
 // 기기 등록 거부(device_registered)가 항상 먼저이며 추가 인증은 그것을 우회하지 못합니다.
-export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required']);
+export const RULE_IDS = Object.freeze([
+  'starter.deny', 'device_registered', 'step_up_required', 'region_changed',
+]);
 
+// 임계치 출처: 공식 계약에 있는 값은 stepUp.authAgeSeconds의 0~900초 범위와 recentEvents
+// 최대 12건뿐입니다. 아래 시각 구간·600초·10건·risk_signal=대량 읽기는 공식 자료에
+// 없는 이 학생 코드의 가정이며, 제공 fixture 한 쌍(3시·unusual·20건)에 맞춘 값입니다.
 // 시험·연습용 가상 사건만 이 출처 표식을 달고 옵니다. 실제 경로의 source는 "none"이며,
 // 그 경우 시각·네트워크를 알 수 없으므로 정상값으로 채우지 않고 복합 규칙은 판단하지 않습니다.
 const VIRTUAL_SIGNAL_SOURCE = 'judge_fixture';
@@ -28,6 +33,11 @@ const isObject = value => value !== null && typeof value === 'object' && !Array.
 const isCount = value => Number.isInteger(value) && value >= 0;
 
 // 평소와 다른 시각: 0~5시, 23시 (사용자별 평소 시각 정보는 계약에 없어 고정 구간으로 둡니다).
+// 지역 급변: 계약에는 이전 지역·시간차 필드가 없어 단순 변경과 급변을 구분할 수 없습니다.
+// 알려진 값은 local/foreign/unknown뿐이므로, 가상 사건에서 local이 아닌 확정 지역값이면
+// 급변 의심으로 보고 추가 확인만 요청합니다(영구 차단하지 않음, unknown은 판단 보류).
+const KNOWN_HOME_REGION = 'local';
+const UNKNOWN_REGION = 'unknown';
 const isUnusualHour = hour => hour <= 5 || hour >= 23;
 
 function hasSubject(request) {
@@ -44,25 +54,30 @@ function stepUpVerified(stepUp) {
     && isCount(stepUp.authAgeSeconds) && stepUp.authAgeSeconds <= MAX_STEP_UP_AGE_SECONDS;
 }
 
-// 'anomalous' | 'normal' | 'unknown'
-//  - unknown: 엔진이 가상 사건 출처를 달지 않았거나 값이 없음 → 정상값으로 채우지 않고 판단 보류
-//  - anomalous: 세 조건이 모두 확인됨, 또는 가상 사건 출처인데 값이 계약 모양이 아님(믿을 수 없음)
+// 반환: 이상 사유 규칙 이름('step_up_required' | 'region_changed') 또는 null
+//  - null: 정상이거나, 엔진이 가상 사건 출처를 달지 않아 판단 보류(정상값으로 채우지 않음)
+//  - 가상 사건 출처인데 값이 계약 모양이 아니면 믿을 수 없으므로 이상으로 봅니다
 function assessCompositeAnomaly(request) {
   const { signals, recentEvents } = request;
-  if (!isObject(signals) || signals.source !== VIRTUAL_SIGNAL_SOURCE) return 'unknown';
+  if (!isObject(signals) || signals.source !== VIRTUAL_SIGNAL_SOURCE) return null;
 
   const wellFormed = Number.isInteger(signals.hour) && signals.hour >= 0 && signals.hour <= 23
     && typeof signals.network === 'string' && typeof signals.region === 'string'
     && Array.isArray(recentEvents) && recentEvents.length <= MAX_RECENT_EVENTS
     && recentEvents.every(event => isObject(event) && typeof event.kind === 'string'
       && isCount(event.ageSeconds) && isCount(event.count));
-  if (!wellFormed) return 'anomalous';
+  if (!wellFormed) return 'step_up_required';
 
   const bulkRead = recentEvents
     .filter(event => event.kind === BULK_EVENT_KIND && event.ageSeconds <= BULK_MAX_AGE_SECONDS)
     .reduce((sum, event) => sum + event.count, 0) >= BULK_MIN_COUNT;
-  return isUnusualHour(signals.hour) && signals.network === UNUSUAL_NETWORK && bulkRead
-    ? 'anomalous' : 'normal';
+  if (isUnusualHour(signals.hour) && signals.network === UNUSUAL_NETWORK && bulkRead) {
+    return 'step_up_required';
+  }
+  if (signals.region !== KNOWN_HOME_REGION && signals.region !== UNKNOWN_REGION) {
+    return 'region_changed';
+  }
+  return null;
 }
 
 export async function decide(request) {
@@ -72,11 +87,12 @@ export async function decide(request) {
       return response(request, 'deny', 'device_not_registered', ['device_registered']);
     }
     // 2) 복합 이상 접속은 추가 확인 전까지 자료를 주지 않습니다(영구 차단 아님).
-    if (assessCompositeAnomaly(request) === 'anomalous') {
+    const anomalyRule = assessCompositeAnomaly(request);
+    if (anomalyRule) {
       if (stepUpVerified(request.stepUp)) {
-        return response(request, 'allow', 'approved', ['device_registered', 'step_up_required']);
+        return response(request, 'allow', 'approved', ['device_registered', anomalyRule]);
       }
-      return response(request, 'step_up', 'step_up_required', ['step_up_required']);
+      return response(request, 'step_up', 'step_up_required', [anomalyRule]);
     }
     return response(request, 'allow', 'approved', ['device_registered']);
   }

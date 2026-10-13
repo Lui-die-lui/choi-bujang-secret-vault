@@ -111,18 +111,19 @@ git show HEAD:public/data.json
 
 **규칙 `step_up_required`** (`src/decider.mjs`, `RULE_IDS`에 추가). `GET notes` 요청에서 순서대로:
 1. `deviceRegistered !== true` 또는 `subjectId` 없음 → `deny` / `device_not_registered` (6단계 그대로, 항상 먼저. 추가 인증이 이걸 우회하지 못함)
-2. `signals.source === 'judge_fixture'`이고 **세 조건이 모두** 참 → 시각 0~5시 또는 23시, `network === 'unusual'`, 최근 600초 안 `risk_signal` 사건 건수 합계 10 이상 → 추가 인증이 없으면 `step_up` / `step_up_required`, 엔진이 검증한 `stepUp.verified === true`이고 `authAgeSeconds`가 0~900 정수면 `allow` / `approved`
+2. `signals.source === 'judge_fixture'`이고 **세 조건이 모두** 참(또는 아래 지역 급변) → 시각 0~5시 또는 23시, `network === 'unusual'`, 최근 600초 안 `risk_signal` 사건 건수 합계 10 이상 → 추가 인증이 없으면 `step_up` / `step_up_required`, 엔진이 검증한 `stepUp.verified === true`이고 `authAgeSeconds`가 0~900 정수면 `allow` / `approved`
 3. 그 외 → `allow` / `approved`
 
 - 가상 출처인데 `hour`·`recentEvents` 모양이 계약과 다르면(위조·결손) 정상으로 채우지 않고 `step_up` 처리합니다. 출처가 `none`이거나 다른 값이면 시각·네트워크를 알 수 없어 이 규칙은 판단을 보류하고 기존 6단계 규칙만 적용합니다(정상값으로 채우지 않음).
-- 시각 구간(0~5, 23시)과 대량 기준(10건/10분)은 계약에 값이 없어 제가 정한 가정입니다. 제공 fixture(3시·`unusual`·20건)와 정상(14시·`usual`·0건)만 근거입니다.
-- **지역만 바뀐 경우**는 제공 시험이 요구하는 판정이 없어 이번 규칙에 넣지 않았습니다(`deny`로 막지 않고 6단계 규칙대로 `allow`). 필요하면 별도로 정해야 합니다.
+- **지역 급변(`region_changed`, 후속 보완)**: CHECK.md 괴물 목록에 "가상 접속 지역이 급변한 사건"이 있어, `judge_fixture` 가상 사건에서 `signals.region`이 `local`도 `unknown`도 아니면 `step_up` / `step_up_required`(규칙 `region_changed`)로 보냅니다. 재인증이 확인되면 `allow`, 영구 `deny`는 하지 않습니다. **한계**: 계약에는 이전 지역·시간차 같은 "급변" 필드가 없어 단순 지역 변경과 급변을 구분할 수 없습니다. 알려진 값(`local`/`foreign`/`unknown`)만 보고 정한 가정이며, 부족한 정보는 "이전 접속 지역과 그 시각"입니다.
+- **임계치의 근거**: 공식 자료(계약·시험 코드)에 있는 것은 `stepUp.authAgeSeconds` 0~900초 범위와 `recentEvents` 최대 12건뿐입니다. 시각 구간(0~5시·23시), 최근 600초, `risk_signal` 합계 10건, 그리고 `risk_signal`이 "대량 자료 읽기"를 뜻한다는 해석은 **공식 근거가 없는 제 가정**이며 fixture 한 쌍(3시·`unusual`·20건)에 맞춘 값입니다. 공식 요구사항이 아닙니다.
+- **민감 메모와 추가 인증**: 계약에 민감 자료를 구분하는 필드가 없어(`route`는 `GET /notes/:id`) 민감 메모만 따로 식별할 수 없습니다. 제공 fixture의 정상 요청은 `stepUp.verified:false`인데 `allow`여야 하므로, 추가 인증 요구는 복합 이상·지역 급변 조건 안에서만 적용됩니다. 그 조건에서 추가 인증을 마치지 않은 요청은 통과하지 못합니다(`step_up`).
 
 **시험 결과(실제 실행, 가상 요청 연습이며 심판 판정이 아님)**:
 - `npm run decider:test`: 통과 4건(등록 기기 정상 allow / 미등록 기기 deny `device_not_registered` / 복합 이상 `step_up` `step_up_required` / 재인증 확인 후 allow).
 - `npm run fixture:7`: `정상 사건: allow`, `복합 이상 사건: step_up`.
 - `npm run test:r5`: 2 pass / 0 fail. (`npm run decider`라는 명령은 package.json에 없습니다.)
-- 추가 직접 확인: 미등록 기기+재인증 → `deny`, `stepUp.authAgeSeconds` 5000 또는 `verified:"true"`(문자열) → 여전히 `step_up`, 신호 하나만 이상(시각/네트워크/지역/대량 읽기 각각) → `allow`, 출처 `none`·`client_header` → 기존 규칙(`allow`).
+- 추가 직접 확인: 미등록 기기+재인증 → `deny`, `stepUp.authAgeSeconds` 5000 또는 `verified:"true"`(문자열) → 여전히 `step_up`, 신호 하나만 이상(시각/네트워크/대량 읽기 각각) → `allow`, 지역만 `foreign` → `step_up`(재인증 확인 시 `allow`), 출처 `none`·`client_header` → 기존 규칙(`allow`).
 
 **실제 재로그인 계약**: `stepUp`(엔진이 검증한 추가 인증 여부와 인증 나이)이 계약에 있어 그 값만 사용합니다. 그러나 이 저장소의 `api/*.mjs`는 `decide()`를 호출하지 않고 반 엔진·심판 환경이 이 판정기를 호출하므로, **실제 자료 차단과 새 로그인 후 허용은 이 세션에서 실행하지 못했습니다(미실행).** 위 결과는 가상 판정 시험일 뿐 실제 접근 차단 성공의 증거가 아닙니다.
 
