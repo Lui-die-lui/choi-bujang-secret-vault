@@ -17,7 +17,10 @@ export async function runAttackChecks(config) {
   // test/zones.test.mjs의 인메모리 대역으로만 확인합니다(실제 A/B 계정 API 실측은 미실행).
   // 7단계: 복합 이상 접속 규칙(step_up_required)도 같은 이유로 실제 HTTP로 점검할
   // 길이 없어 가상 사건 연습(npm run decider:test, fixture:7)으로만 확인합니다.
-  if (![5, 6, 7, 8].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  // 9단계: 탐지 규칙(burst_read)과 회수 제안은 src/detect.mjs가 결과만 돌려주고 이 앱의
+  // api/*.mjs가 호출하지 않아 실제 HTTP로 점검할 길이 없습니다(npm run detect:test 가상
+  // 사건 연습만 실행, 운영 엔진의 사건 전달·회수는 미실행).
+  if (![5, 6, 7, 8, 9].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);

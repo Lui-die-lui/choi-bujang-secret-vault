@@ -2,7 +2,7 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 지금 작동하는 기능 (8단계 저장점)
+## 지금 작동하는 기능 (9단계 저장점)
 
 - 화면(`/`)에서 이메일·비밀번호로 로그인/로그아웃할 수 있습니다. 로그인·세션 갱신·로그아웃은 전부 서버 함수(`/api/auth/login`·`/api/auth/refresh`·`/api/auth/logout`)가 공식 Supabase SDK로 처리하며, **화면 코드에는 Supabase 프로젝트 URL이나 공개 키가 전혀 없습니다.**
 - 로그인해야만 `/api/notes`(2단계 공개 가상 메모 4건, `t02_vault_notes`, 소유자 없는 공용 자료)가 보입니다. 로그아웃하면 화면의 메모도 바로 지워집니다.
@@ -13,6 +13,7 @@
 - **6단계**: `src/decider.mjs`(ALEPH SDP 엔진이 호출하는 ZTNA 판정기)가 "자료실 읽기" 요청(`service: 'notes'`, `method: 'GET'`)에 기기 등록 조건을 겁니다 — `deviceRegistered`가 명시적으로 `true`일 때만 `allow`, 그 외(미등록·값 없음)는 `deny`+`device_not_registered`로 거부합니다. 아래 "6단계: 등록한 기기만 자료실에 들어옵니다" 절 참고.
 - **7단계**: 같은 판정기가 "평소와 다른 시각 + 처음 보는 네트워크 + 갑작스러운 대량 자료 읽기"가 겹친 가상 접속 사건을 `step_up`(추가 확인)으로 보냅니다. 아래 "7단계" 절 참고. 실제 자료 차단·재로그인 후 허용은 **미실행**입니다.
 - **8단계**: 판정기가 자료를 구역(자원 ID)으로 나눕니다 — 메모는 `note:<id>`, 강사 공지는 `announcement:<id>`. 알 수 없는 경로·메서드는 거부하고, 강사 공지 수정은 항상 거부합니다(강사 권한을 검증해 주는 계약이 없음). **판정기의 소유자(A/B) 구분은 미구현**이며 남의 메모 차단은 최종 API의 `owner_id` 조건만 맡습니다. 아래 "8단계" 절 참고.
+- **9단계**: `src/detect.mjs`의 `detect(events)`가 같은 가명 사용자의 `GET` 사건이 10분 안에 120건을 넘을 때만 `propose_revocation`(이유 코드 `burst_read`)을 **제안**합니다. 그 밖에는 `observe`입니다. 실제 회수·권한 변경은 하지 않습니다. 아래 "9단계" 절 참고.
 - **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
 - **남은 약점**: `/api/notes`(공용 자료)는 로그인만 확인하고 소유자 개념이 없습니다(의도된 설계, 아래 4단계 절 참고). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
@@ -195,6 +196,22 @@ git show HEAD:public/data.json
 - 확인 방법: 다음 제출 뒤 `my-notes.get`을 검색해 (1) 심판의 A·B 줄이 있는지, (2) A와 B의 `uid`가 서로 다른지, (3) B가 A의 자료 ID를 읽을 때 `outcome`이 무엇인지 봅니다. 시험: `npm run test:zones`(진단 로그 시험 포함, 12건).
 - **401 원인 구분(추가 진단)**: `unauthorized` 줄에 `auth` 항목을 붙였습니다(`src/auth-diagnostics.mjs`, 서명 검증이나 권한 판단은 하지 않고 모양만 분류). `present`(헤더 유무), `bearer`(형식), `issuer`(`none`/`unparseable`/`judge`/`student`/`other`)와, 심판 토큰이면 `algEs256`·`audOk`·`roleJudge`·`identityAB`·`subV4`·`runV4`·`lifetimeOk`·`expired`의 참/거짓만 남깁니다. 목록·공용 경로는 `my-notes.list`·`notes.list` 이벤트로 같은 항목을 남깁니다. 토큰 원문·클레임 값은 기록하지 않습니다. 모두 참인데도 401이면 서명·키 검증 단계의 실패로 볼 수 있습니다.
 - **한계**: 로그가 보이지 않아도 "심판이 API를 호출하지 않았다"나 "판정기를 실행했다"를 의미하지 않습니다(로그 보관 기간·검색 범위·다른 경로 호출 가능). 심판 결과 화면은 판정 코드·설명·점수만 제공하며, 판정기 격리 실행의 출력(로그)은 제공되지 않아 판정기에 로그를 넣어도 관찰할 수 없어 추가하지 않았습니다.
+
+## 9단계: 도플갱어를 찾고 권한을 거둡니다
+
+**기준 자료**: `docs/DETECT_EVENTS.md`와 `scripts/detect-test.mjs`(가상 사건 계약). CHECK.md에는 괴물 목록과 프롬프트 순서만 있고 사건 자료는 없습니다. `src/decider.mjs`와 접속 허용·거부 응답 형식은 바꾸지 않았습니다.
+
+- **입력 처리**: 사건마다 계약의 세 값 `at`·`method`·`identity.sub`만 읽습니다. 다른 값(메모 내용·토큰·실명 등)은 사건에 들어 있어도 읽지 않고 저장·출력·오류 문구에 넣지 않습니다. 모양이 계약과 다른 사건은 세지 않습니다. 배열이 아니면 `invalid_detection_events` 오류(값 없음)입니다.
+- **탐지 규칙 `burst_read`**: 같은 `identity.sub`의 `GET` 사건이 어느 10분 구간에서든 **120건을 넘을 때만** 의심으로 봅니다. 정확히 120건, 다른 사용자와 합쳐야 넘는 경우, 10분 밖으로 흩어진 경우는 `{ action: 'observe' }`입니다.
+- **회수 제안**: 의심 사건에만 `{ action: 'propose_revocation', reasonCode: 'burst_read', subject: '<가명 사용자>' }`를 돌려줍니다. 대상은 가장 먼저 기준을 넘은 한 명입니다. 이 함수는 결과만 돌려주며 회수 API를 만들거나 기기·접속 권한을 바꾸지 않습니다.
+- **과제 문구와 다른 점(구현하지 못함)**: 과제는 "평소와 다른 네트워크 + 갑작스러운 다량 조회"의 복합 조건과 "가상 기기 한 개" 대상을 요구합니다. 그러나 제공된 사건에는 네트워크·지역·기기·기존 판정 값이 없고, 계약이 정한 결과도 `subject`(가명 사용자)입니다. 필드 이름을 지어내지 않기 위해 계약 그대로 구현했습니다. 부족한 정보: ① 사건에 담기는 네트워크 신호의 필드 이름과 값, ② 기기 ID 필드와 결과에 넣을 대상 필드 이름.
+
+**시험(실제 실행, 가상 사건 연습이며 심판 판정이 아님)**
+- `npm run detect:test`: 6건 통과(정상 30건 `observe` / 120건 `observe` / 121건·200건 `propose_revocation` / 서로 다른 사용자 각 100건 `observe` / 10분 밖 200건 `observe`).
+- 추가 직접 확인: 사건에 메모·토큰·실명 모양의 값을 섞어도 결과에 나오지 않음, `POST` 200건은 `observe`, 모양이 틀린 사건은 `observe`, 두 사용자 중 폭주한 한 명만 대상.
+- 기존 회귀: `npm run decider:test` 4건, `npm run test:zones` 13건, `npm run test:r5` 2건 통과.
+
+**미실행**: 운영 반 엔진의 사건 전달, 회수 제안 집행, 회수 뒤 재접속 차단, 경과 시간 측정은 연결·확인하지 않았습니다. 이 앱의 `api/*.mjs`는 `detect()`를 호출하지 않습니다.
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
 
