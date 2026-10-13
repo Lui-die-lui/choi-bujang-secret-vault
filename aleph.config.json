@@ -16,11 +16,12 @@
     "GET /api/my-notes/:id",
     "PUT /api/my-notes/:id",
     "DELETE /api/my-notes/:id",
-    "POST /api/my-notes/:id/restore",
+    "GET /api/note-restore/:id",
+    "POST /api/note-restore/:id",
     "POST /api/auth/login",
     "POST /api/auth/refresh",
     "POST /api/auth/logout"
   ],
   "originalApiUrl": "https://iyxvvnrekxthoixcdlht.supabase.co/rest/v1/t03_personal_notes",
-  "restoreRoute": "POST /api/my-notes/:id/restore"
+  "restoreRoute": "POST /api/note-restore/:id"
 }

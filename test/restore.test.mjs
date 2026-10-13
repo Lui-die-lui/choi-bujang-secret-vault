@@ -69,7 +69,7 @@ mock.module(new URL('../src/notes-auth.mjs', import.meta.url).href, {
 process.env.SUPABASE_URL = 'https://example.invalid';
 process.env.SUPABASE_SECRET_KEY = 'test-only-not-a-real-key';
 
-const { default: restore } = await import('../api/my-notes/[id]/restore.mjs');
+const { default: restore } = await import('../api/note-restore/[id].mjs');
 const { default: list } = await import('../api/my-notes/index.mjs');
 const { backupRow, contentHash } = await import('../src/note-backup.mjs');
 
@@ -115,12 +115,13 @@ test('복원: 변조된 B의 메모 한 건이 사본과 같은 ID·소유자·�
 
   const out = await call(restore, { token: 'token-b', query: { id: NOTE_B } });
   assert.equal(out.status, 200);
-  assert.deepEqual(out.body, { id: NOTE_B, restored: true, contentSha256: expected });
+  assert.deepEqual(out.body, { id: NOTE_B, restored: true, backupVerified: true,
+    backupVersion: { createdAt: null, contentSha256: expected }, changes: ['title', 'body'], contentSha256: expected });
   assert.deepEqual(row(NOTE_B), note(NOTE_B, B, 'B 제목', 'B 본문'));
   assert.equal(contentHash(row(NOTE_B).title, row(NOTE_B).content), expected);
   assert.equal(others(NOTE_B), before); // 다른 메모·다른 계정 자료는 그대로
   assert.equal(JSON.stringify(tables.t10_note_backups), backups); // 사본도 그대로
-  assert.match(logs.text(), /"event":"my-notes.restore","outcome":"restored"/u);
+  assert.match(logs.text(), /"event":"note-restore.restore","outcome":"restored"/u);
   assert.doesNotMatch(logs.text() + JSON.stringify(out.body), /B 본문|B 제목|변조|token/u);
   logs.done();
 });
@@ -205,16 +206,16 @@ test('복원 거부: 다른 계정의 메모, 비로그인, 다른 메서드, �
   assert.equal(cross.status, 404); // B는 A의 사본으로 A의 메모를 되돌릴 수 없다
   assert.deepEqual(cross.body, { error: 'not_found' });
   assert.equal((await call(restore, { query: { id: NOTE_B } })).status, 401);
-  assert.equal((await call(restore, { method: 'GET', token: 'token-b', query: { id: NOTE_B } })).status, 405);
+  assert.equal((await call(restore, { method: 'PUT', token: 'token-b', query: { id: NOTE_B } })).status, 405);
   assert.equal((await call(restore, { method: 'DELETE', token: 'token-b', query: { id: NOTE_B } })).status, 405);
   assert.equal((await call(restore, { token: 'token-b', query: { id: 'export' } })).status, 400);
   // 요청 본문으로 대상·소유자·내용을 바꿀 수 없다(본문은 읽지 않음)
   const forged = await call(restore, { token: 'token-b', query: { id: NOTE_B },
-    body: { id: NOTE_A, owner_id: A, title: '위조', body: '위조', role: 'instructor' } });
+    body: { owner_id: A, title: '위조', body: '위조', role: 'instructor' } });
   assert.equal(forged.status, 200);
   assert.deepEqual(row(NOTE_B), note(NOTE_B, B, 'B 제목', 'B 본문'));
   // 진단 로그에는 본문 항목의 이름과 종류·길이만 남고 값은 남지 않는다
-  assert.match(logs.text(), /"request":\{"body":\{"id":"string:36","owner_id":"string:36","title":"string:2","body":"string:2","role":"string:10"\}/u);
+  assert.match(logs.text(), /"request":\{"body":\{"owner_id":"string:36","title":"string:2","body":"string:2","role":"string:10"\}/u);
   assert.doesNotMatch(logs.text(), /위조|instructor|token-b/u);
   assert.equal(JSON.stringify(tables.t03_personal_notes), snapshot);
   logs.done();
@@ -238,5 +239,54 @@ test('사본: 메모를 처음 만들 때 한 번 남고, 사본을 남기지 �
   assert.equal(again.status, 201);
   assert.match(logs.text(), /my-notes backup failed/u);
   assert.doesNotMatch(logs.text(), /새 본문|또 본문/u);
+  logs.done();
+});
+
+test('미리보기: 실행 전에 사본 버전과 바뀔 항목만 보여 주고 아무것도 쓰지 않는다', async () => {
+  reset();
+  const logs = quiet();
+  const version = { createdAt: null, contentSha256: contentHash('B 제목', 'B 본문') };
+  const peek = () => call(restore, { method: 'GET', token: 'token-b', query: { id: NOTE_B } });
+
+  // 변조: 본문만 바뀐 경우
+  row(NOTE_B).content = '변조 본문';
+  let snapshot = JSON.stringify(tables);
+  let out = await peek();
+  assert.equal(out.status, 200);
+  assert.deepEqual(out.body, { id: NOTE_B, backupVerified: true, backupVersion: version,
+    changes: ['body'], restored: false });
+  assert.equal(JSON.stringify(tables), snapshot); // 메모·사본 모두 그대로
+
+  // 삭제: 지워진 메모를 다시 만들게 됨
+  tables.t03_personal_notes = tables.t03_personal_notes.filter(r => r.id !== NOTE_B);
+  snapshot = JSON.stringify(tables);
+  out = await peek();
+  assert.deepEqual(out.body.changes, ['recreate_deleted_note']);
+  assert.equal(JSON.stringify(tables), snapshot);
+
+  // 미리보기도 사본이 없거나 검증에 실패하면 멈춘다. 남의 메모는 보이지 않는다.
+  tables.t10_note_backups.find(r => r.note_id === NOTE_B).content_sha256 = '0'.repeat(64);
+  assert.equal((await peek()).status, 409);
+  assert.equal((await call(restore, { method: 'GET', token: 'token-b', query: { id: NOTE_A } })).status, 404);
+  assert.equal((await call(restore, { method: 'GET', query: { id: NOTE_B } })).status, 401);
+  assert.doesNotMatch(logs.text() + JSON.stringify(out.body), /B 본문|B 제목|변조/u);
+  logs.done();
+});
+
+test('복원: 본문의 id가 경로의 ID와 다르면 중단하고, 같으면 그대로 복원한다', async () => {
+  reset();
+  const logs = quiet();
+  row(NOTE_B).content = '변조 본문';
+  const snapshot = JSON.stringify(tables.t03_personal_notes);
+  const wrong = await call(restore, { token: 'token-b', query: { id: NOTE_B }, body: { id: NOTE_B2 } });
+  assert.equal(wrong.status, 400);
+  assert.equal(JSON.stringify(tables.t03_personal_notes), snapshot);
+  const same = await call(restore, { token: 'token-b', query: { id: NOTE_B }, body: { id: NOTE_B } });
+  assert.equal(same.status, 200);
+  assert.deepEqual(same.body.changes, ['body']);
+  assert.equal(row(NOTE_B).content, 'B 본문');
+  // 이미 사본과 같은 메모를 다시 복원하면 바뀔 항목이 없다
+  const again = await call(restore, { token: 'token-b', query: { id: NOTE_B } });
+  assert.deepEqual([again.status, again.body.changes], [200, []]);
   logs.done();
 });
