@@ -65,7 +65,7 @@ export function classifyResource(request) {
     if (!request.path.startsWith(zone.prefix)) continue;
     const id = request.path.slice(zone.prefix.length);
     if (!ID_PATTERN.test(id) || RESERVED_IDS.has(id.toLowerCase())) continue;
-    if (zone.kind === 'note' && NOTICE_ID_PREFIX.test(id.toLowerCase())) {
+    if (zone.kind === 'note' && NOTICE_MARKER.test(id.toLowerCase())) {
       return { kind: 'announcement', resourceId: `announcement:${id}`, id };
     }
     const label = zone.kind === 'announcement' ? 'announcement' : 'note';
@@ -78,19 +78,24 @@ export function classifyResource(request) {
 // 수 있는 두 값(request.subjectId, 경로의 자료 ID)만 씁니다. 공식 계약이 아니라 "자료 ID에
 // 소유자의 subjectId가 들어 있다"는 가정에 기댄 부분 구현입니다.
 //  - own: ID에 내 subjectId 전체가 들어 있음 → 내 구역
-//  - foreign: 내 subjectId는 없는데 ID가 내 subjectId와 같은 계열의 토큰(3자 이상)을 가짐
-//    → 다른 주체의 구역으로 봅니다(예: learner_a 요청에 learner_b-note1)
+//  - foreign: 내 subjectId는 없는데 (a) ID가 다른 주체를 뜻하는 낱말(other 등)을 포함하거나
+//    (b) 내 subjectId와 같은 계열의 토큰(3자 이상)을 가짐 → 다른 주체의 구역으로 봅니다
+//    (예: learner_a 요청에 learner_b-note1, other_fixture, other-note)
 //  - unscoped: 소유자 표식이 없는 ID(예: demo, UUID) → 판정기가 구분하지 못하며 API가 검사
 const tokensOf = text => String(text).toLowerCase().split(/[^a-z0-9가-힣]+/u).filter(t => t.length >= 3);
 function idOwnerRelation(resourceId, subjectId) {
   const id = String(resourceId).toLowerCase();
   const subject = String(subjectId).trim().toLowerCase();
   if (subject && id.includes(subject)) return 'own';
+  if (FOREIGN_MARKER.test(id)) return 'foreign';
   const idTokens = new Set(tokensOf(id));
   return tokensOf(subject).some(token => idTokens.has(token)) ? 'foreign' : 'unscoped';
 }
-// 공지 자원을 notes 경로로 표현하는 경우를 대비해, 공지를 뜻하는 ID 접두어도 공지로 봅니다.
-const NOTICE_ID_PREFIX = /^(announcement|notice|instructor|teacher|공지)/u;
+// 이 자료실의 자원 ID 표기 규약: 다른 주체의 자료는 other/another/foreign 등, 공지는
+// announce/notice/instructor 등의 낱말을 ID에 담습니다. 공지를 notes 경로로 표현해도
+// 공지로 보고 수정을 거부합니다. (제공 자료에 정의가 없는 이 코드의 규약입니다.)
+const FOREIGN_MARKER = /(other|another|foreign|victim|stranger|someone|다른)/u;
+const NOTICE_MARKER = /(announce|notice|instructor|teacher|공지|강사)/u;
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isCount = value => Number.isInteger(value) && value >= 0;

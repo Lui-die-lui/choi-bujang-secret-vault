@@ -195,6 +195,16 @@ test('판정기: 소유자 표식이 없는 ID(demo, UUID)는 구분하지 못�
   assert.equal(await verdict({ subjectId: 'learner_b', path: `/notes/${NOTE_A}` }), 'allow');
 });
 
+test('판정기: other 등 다른 주체 표식이 든 ID는 거부, 공지 낱말이 든 ID는 위치와 무관하게 공지', async () => {
+  for (const path of ['/notes/other', '/notes/other_fixture', '/notes/another-note', '/notes/note-foreign-1']) {
+    assert.equal(await verdict({ path }), 'deny', path);
+    assert.equal(await verdict({ path, method: 'PUT', route: 'PUT /notes/:id' }), 'deny', path);
+  }
+  assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id', path: '/notes/class-notice-3' }), 'deny');
+  assert.equal(await verdict({ path: '/notes/learner_fixture-other' }), 'allow'); // 내 subjectId 포함 → 내 구역
+  assert.equal(await verdict({ path: `/notes/${NOTE_B}` }), 'allow'); // UUID는 API가 검사
+});
+
 test('판정기: 공지 ID를 notes 경로로 표현해도 수정은 거부', async () => {
   assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id', path: '/notes/announcement-1' }), 'deny');
   assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id', path: '/notes/notice_2' }), 'deny');
