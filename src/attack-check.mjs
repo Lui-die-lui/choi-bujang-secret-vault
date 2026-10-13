@@ -9,7 +9,11 @@ const SUPABASE_ANON_KEY = 'sb_publishable_T6veZAYIlx2HYpfPOTJ50g_yXVERRoW';
 const SECRET_KEY_PATTERN = /sb_secret_[A-Za-z0-9_-]{12,}/u;
 
 export async function runAttackChecks(config) {
-  if (config.step !== 5) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  // 6단계: src/decider.mjs의 기기 등록 규칙은 반 엔진만 호출하고 이 앱의
+  // api/*.mjs 어디서도 decide()를 부르지 않아(이전 단계부터 동일), 실제 HTTP
+  // 요청으로 새로 점검할 길이 없습니다. 5단계부터의 보호(로그인·소유자·직접
+  // 접근 차단)는 이번 단계에서 안 바뀌었으니 같은 점검을 그대로 재사용합니다.
+  if (![5, 6].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
