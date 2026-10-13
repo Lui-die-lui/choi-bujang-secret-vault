@@ -8,6 +8,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 const fingerprint = userId => createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
 
+// 10단계 진단(S10_BACKUP_UNVERIFIED): 복원 요청이 어떤 모양으로 오는지 확인하려고 본문·쿼리의
+// 항목 이름과 값의 종류·길이만 기록합니다. 값 자체는 기록하지 않고, 이름은 영문·숫자·_·-만
+// 32자까지 남깁니다. 복원 동작과 응답은 바꾸지 않습니다(본문은 여전히 판단에 쓰지 않음).
+const safeName = name => String(name).replace(/[^A-Za-z0-9_-]/gu, '?').slice(0, 32);
+function describeFields(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return { type: Array.isArray(value) ? 'array' : typeof value, length: value.length ?? null };
+  }
+  return Object.fromEntries(Object.keys(value).slice(0, 12).map(key => {
+    const item = value[key];
+    const type = item === null ? 'null' : Array.isArray(item) ? 'array' : typeof item;
+    return [safeName(key), typeof item === 'string' || Array.isArray(item) ? `${type}:${item.length}` : type];
+  }));
+}
+function requestShape(request) {
+  const { id: _id, ...query } = request.query ?? {};
+  const contentType = request.headers?.['content-type'];
+  return { body: describeFields(request.body), query: describeFields(query),
+    contentType: typeof contentType === 'string' ? safeName(contentType.split(';')[0]) : null };
+}
+
 // 10단계: 비공개 사본에서 지정한 메모 한 건만 되살립니다 (POST /api/my-notes/:id/restore).
 // 로그인은 다른 자료 API와 같은 verifyRequestLogin으로 확인하고, 요청 본문은 읽지 않습니다.
 // 사본의 메모 ID·소유자·내용 해시가 하나라도 맞지 않으면 아무것도 바꾸지 않고 중단합니다.
@@ -37,8 +59,10 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'method_not_allowed' });
   }
 
+  const shape = requestShape(request);
   const log = (outcome, extra = {}) => console.info(JSON.stringify({
-    event: 'my-notes.restore', outcome, uid: fingerprint(identity.userId), resource: `note:${id}`, ...extra,
+    event: 'my-notes.restore', outcome, kind: identity.kind, identity: identity.identity ?? null,
+    uid: fingerprint(identity.userId), resource: `note:${id}`, ...extra, request: shape,
   }));
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },

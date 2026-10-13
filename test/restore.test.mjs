@@ -172,6 +172,9 @@ test('복원 거부: 다른 계정의 메모, 비로그인, 다른 메서드, �
     body: { id: NOTE_A, owner_id: A, title: '위조', body: '위조', role: 'instructor' } });
   assert.equal(forged.status, 200);
   assert.deepEqual(row(NOTE_B), note(NOTE_B, B, 'B 제목', 'B 본문'));
+  // 진단 로그에는 본문 항목의 이름과 종류·길이만 남고 값은 남지 않는다
+  assert.match(logs.text(), /"request":\{"body":\{"id":"string:36","owner_id":"string:36","title":"string:2","body":"string:2","role":"string:10"\}/u);
+  assert.doesNotMatch(logs.text(), /위조|instructor|token-b/u);
   assert.equal(JSON.stringify(tables.t03_personal_notes), snapshot);
   logs.done();
 });
