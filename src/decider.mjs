@@ -12,8 +12,16 @@
 // request.recentEvents, request.stepUp뿐입니다. 이 값들은 브라우저 헤더가 아니라
 // 엔진이 만들어 넘긴 요청 필드이며, 모양이 계약과 맞지 않으면 믿지 않습니다.
 // 기기 등록 거부(device_registered)가 항상 먼저이며 추가 인증은 그것을 우회하지 못합니다.
+//
+// 8단계: 자료를 구역(자원)으로 나눕니다. 요청의 service·method·route·path·queryLength를
+// 정확히 대조해 자원 ID(note:<id> / announcement:<id>)를 만들고, 알 수 없는 경로·
+// 허용하지 않은 메서드는 거부합니다. 이 판정기는 메모의 소유자나 강사 여부를 알 수
+// 없습니다(계약에 소유자·역할 필드가 없고 subjectId는 Supabase 사용자 번호와 비교할 수
+// 없는 가명입니다). 그래서 "남의 메모 거부"는 최종 자료 API(api/my-notes)의 owner_id
+// 조건이 맡고, 강사 공지 수정은 신뢰할 강사 권한 정보가 없으므로 항상 거부합니다.
 export const RULE_IDS = Object.freeze([
   'starter.deny', 'device_registered', 'step_up_required', 'region_changed',
+  'note_zone', 'instructor_notice_only',
 ]);
 
 // 임계치 출처: 공식 계약에 있는 값은 stepUp.authAgeSeconds의 0~900초 범위와 recentEvents
@@ -28,6 +36,37 @@ const BULK_MIN_COUNT = 10; // 최근 사건 묶음의 읽기 건수 합계가 �
 const BULK_MAX_AGE_SECONDS = 600; // 최근 10분 안의 사건만 셉니다
 const MAX_RECENT_EVENTS = 12;
 const MAX_STEP_UP_AGE_SECONDS = 900;
+
+// 구역 경로 표: 계약의 route 모양과 path를 둘 다 정확히 맞춥니다(부분 문자열·startsWith 금지).
+// :id는 자료 ID 한 칸만이며, 기능은 쿼리가 아니라 route로만 고릅니다(쿼리는 길이 0만 허용).
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
+const RESERVED_IDS = new Set(['export', 'import', 'search', 'all', 'admin']);
+const ZONE_ROUTES = Object.freeze([
+  { service: 'notes', route: 'GET /notes', collection: '/notes', kind: 'note_list' },
+  { service: 'notes', route: 'GET /notes/:id', prefix: '/notes/', kind: 'note' },
+  { service: 'notes', route: 'PUT /notes/:id', prefix: '/notes/', kind: 'note' },
+  { service: 'announcements', route: 'PUT /announcements/:id', prefix: '/announcements/', kind: 'announcement' },
+]);
+
+// 알 수 없는 경로·메서드면 null, 아니면 { kind, resourceId }.
+export function classifyResource(request) {
+  if (!isObject(request) || typeof request.route !== 'string' || typeof request.path !== 'string'
+      || typeof request.method !== 'string' || request.queryLength !== 0) return null;
+  for (const zone of ZONE_ROUTES) {
+    if (request.service !== zone.service || request.route !== zone.route
+        || !zone.route.startsWith(`${request.method} `)) continue;
+    if (zone.collection) {
+      if (request.path === zone.collection) return { kind: zone.kind, resourceId: 'note_list' };
+      continue;
+    }
+    if (!request.path.startsWith(zone.prefix)) continue;
+    const id = request.path.slice(zone.prefix.length);
+    if (!ID_PATTERN.test(id) || RESERVED_IDS.has(id.toLowerCase())) continue;
+    const label = zone.kind === 'announcement' ? 'announcement' : 'note';
+    return { kind: zone.kind, resourceId: `${label}:${id}` };
+  }
+  return null;
+}
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isCount = value => Number.isInteger(value) && value >= 0;
@@ -81,21 +120,26 @@ function assessCompositeAnomaly(request) {
 }
 
 export async function decide(request) {
-  if (request.method === 'GET' && request.service === 'notes') {
-    // 1) 기기 등록·로그인 확인이 항상 먼저입니다. 추가 인증으로 되돌릴 수 없습니다.
-    if (request.deviceRegistered !== true || !hasSubject(request)) {
-      return response(request, 'deny', 'device_not_registered', ['device_registered']);
-    }
-    // 2) 복합 이상 접속은 추가 확인 전까지 자료를 주지 않습니다(영구 차단 아님).
-    const anomalyRule = assessCompositeAnomaly(request);
-    if (anomalyRule) {
-      if (stepUpVerified(request.stepUp)) {
-        return response(request, 'allow', 'approved', ['device_registered', anomalyRule]);
-      }
-      return response(request, 'step_up', 'step_up_required', [anomalyRule]);
-    }
-    return response(request, 'allow', 'approved', ['device_registered']);
-  }
+  const zone = classifyResource(request);
+  // 알 수 없는 경로·메서드·쿼리는 새 구역 규칙으로도 허용하지 않습니다.
+  if (!zone) return response(request, 'deny', 'starter_not_ready', [RULE_IDS[0]]);
 
-  return response(request, 'deny', 'starter_not_ready', [RULE_IDS[0]]);
+  // 1) 기기 등록·로그인 확인이 항상 먼저입니다. 구역 규칙이나 추가 인증으로 되돌릴 수 없습니다.
+  if (request.deviceRegistered !== true || !hasSubject(request)) {
+    return response(request, 'deny', 'device_not_registered', ['device_registered']);
+  }
+  // 2) 강사 공지: 계약에 강사 권한을 검증해 넘기는 필드가 없어 항상 거부합니다.
+  //    일반 학생·재인증 여부와 관계없이 허용 분기가 없습니다.
+  if (zone.kind === 'announcement') {
+    return response(request, 'deny', 'zone_not_allowed', ['instructor_notice_only']);
+  }
+  // 3) 복합 이상 접속은 추가 확인 전까지 자료를 주지 않습니다(영구 차단 아님).
+  const anomalyRule = assessCompositeAnomaly(request);
+  if (anomalyRule) {
+    if (stepUpVerified(request.stepUp)) {
+      return response(request, 'allow', 'approved', ['device_registered', anomalyRule, 'note_zone']);
+    }
+    return response(request, 'step_up', 'step_up_required', [anomalyRule]);
+  }
+  return response(request, 'allow', 'approved', ['device_registered', 'note_zone']);
 }

@@ -8,6 +8,21 @@ function serialize(row) {
   return { id: row.id, title: row.title, body: row.content };
 }
 
+// 8단계: 자원 ID는 note:<uuid>입니다(src/decider.mjs의 classifyResource와 같은 표기).
+// 거부(404) 때 소유자 불일치인지 없는 메모인지 서버 로그에만 짧게 남깁니다. 응답은
+// 둘 다 같은 404라 다른 사용자의 자료 존재 여부가 드러나지 않습니다. 토큰·본문은
+// 기록하지 않습니다.
+async function logDenied(supabase, id, method) {
+  let reason = 'not_found';
+  try {
+    const { data } = await supabase.from(TABLE).select('id').eq('id', id).maybeSingle();
+    if (data) reason = 'owner_mismatch';
+  } catch {
+    reason = 'lookup_failed';
+  }
+  console.warn(`my-notes denied: resource=note:${id} method=${method} reason=${reason}`);
+}
+
 // 3단계: 메모 한 건 조회·수정·삭제.
 // 4단계: id 조건과 함께 owner_id = 서버가 검증한 사용자 ID 조건을 쿼리에
 // 같이 넣습니다. 남의 메모는 쿼리 결과가 아예 없으므로 "없는 메모"와 구분
@@ -47,7 +62,10 @@ export default async function handler(request, response) {
       console.error('my-notes read failed:', error.message);
       return response.status(500).json({ error: 'notes_read_failed' });
     }
-    if (!data) return response.status(404).json({ error: 'not_found' });
+    if (!data) {
+      await logDenied(supabase, id, 'GET');
+      return response.status(404).json({ error: 'not_found' });
+    }
     return response.status(200).json(serialize(data));
   }
 
@@ -68,7 +86,10 @@ export default async function handler(request, response) {
       console.error('my-notes update failed:', error.message);
       return response.status(500).json({ error: 'notes_write_failed' });
     }
-    if (!data) return response.status(404).json({ error: 'not_found' });
+    if (!data) {
+      await logDenied(supabase, id, 'PUT');
+      return response.status(404).json({ error: 'not_found' });
+    }
     return response.status(200).json(serialize(data));
   }
 
@@ -84,7 +105,10 @@ export default async function handler(request, response) {
       console.error('my-notes delete failed:', error.message);
       return response.status(500).json({ error: 'notes_write_failed' });
     }
-    if (!data) return response.status(404).json({ error: 'not_found' });
+    if (!data) {
+      await logDenied(supabase, id, 'DELETE');
+      return response.status(404).json({ error: 'not_found' });
+    }
     return response.status(204).end();
   }
 

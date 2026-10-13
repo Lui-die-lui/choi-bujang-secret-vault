@@ -5,6 +5,7 @@
   "scripts": {
     "build": "node scripts/build-public.mjs",
     "test:r5": "node --test test/r5.test.mjs",
+    "test:zones": "node --experimental-test-module-mocks --test test/zones.test.mjs",
     "bundle": "node scripts/bundle.mjs",
     "decider:test": "node scripts/decider-test.mjs",
     "detect:test": "node scripts/detect-test.mjs",

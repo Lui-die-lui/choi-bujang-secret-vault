@@ -2,7 +2,7 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 지금 작동하는 기능 (7단계 저장점)
+## 지금 작동하는 기능 (8단계 저장점)
 
 - 화면(`/`)에서 이메일·비밀번호로 로그인/로그아웃할 수 있습니다. 로그인·세션 갱신·로그아웃은 전부 서버 함수(`/api/auth/login`·`/api/auth/refresh`·`/api/auth/logout`)가 공식 Supabase SDK로 처리하며, **화면 코드에는 Supabase 프로젝트 URL이나 공개 키가 전혀 없습니다.**
 - 로그인해야만 `/api/notes`(2단계 공개 가상 메모 4건, `t02_vault_notes`, 소유자 없는 공용 자료)가 보입니다. 로그아웃하면 화면의 메모도 바로 지워집니다.
@@ -12,6 +12,7 @@
 - `data.json`, `public/data.json`에는 메모가 없습니다(`"notes": []`).
 - **6단계**: `src/decider.mjs`(ALEPH SDP 엔진이 호출하는 ZTNA 판정기)가 "자료실 읽기" 요청(`service: 'notes'`, `method: 'GET'`)에 기기 등록 조건을 겁니다 — `deviceRegistered`가 명시적으로 `true`일 때만 `allow`, 그 외(미등록·값 없음)는 `deny`+`device_not_registered`로 거부합니다. 아래 "6단계: 등록한 기기만 자료실에 들어옵니다" 절 참고.
 - **7단계**: 같은 판정기가 "평소와 다른 시각 + 처음 보는 네트워크 + 갑작스러운 대량 자료 읽기"가 겹친 가상 접속 사건을 `step_up`(추가 확인)으로 보냅니다. 아래 "7단계" 절 참고. 실제 자료 차단·재로그인 후 허용은 **미실행**입니다.
+- **8단계**: 판정기가 자료를 구역(자원 ID)으로 나눕니다 — 메모는 `note:<id>`, 강사 공지는 `announcement:<id>`. 알 수 없는 경로·메서드는 거부하고, 강사 공지 수정은 항상 거부합니다(강사 권한을 검증해 주는 계약이 없음). 남의 메모 차단은 최종 API의 `owner_id` 조건이 맡습니다. 아래 "8단계" 절 참고.
 - **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
 - **남은 약점**: `/api/notes`(공용 자료)는 로그인만 확인하고 소유자 개념이 없습니다(의도된 설계, 아래 4단계 절 참고). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
@@ -126,6 +127,29 @@ git show HEAD:public/data.json
 - 추가 직접 확인: 미등록 기기+재인증 → `deny`, `stepUp.authAgeSeconds` 5000 또는 `verified:"true"`(문자열) → 여전히 `step_up`, 신호 하나만 이상(시각/네트워크/대량 읽기 각각) → `allow`, 지역만 `foreign` → `step_up`(재인증 확인 시 `allow`), 출처 `none`·`client_header` → 기존 규칙(`allow`).
 
 **실제 재로그인 계약**: `stepUp`(엔진이 검증한 추가 인증 여부와 인증 나이)이 계약에 있어 그 값만 사용합니다. 그러나 이 저장소의 `api/*.mjs`는 `decide()`를 호출하지 않고 반 엔진·심판 환경이 이 판정기를 호출하므로, **실제 자료 차단과 새 로그인 후 허용은 이 세션에서 실행하지 못했습니다(미실행).** 위 결과는 가상 판정 시험일 뿐 실제 접근 차단 성공의 증거가 아닙니다.
+
+## 8단계: 자료마다 갈 수 있는 구역을 나눕니다
+
+**자원 ID와 구역** (`src/decider.mjs`의 `classifyResource`): 요청의 `service`·`method`·`route`·`path`·`queryLength`를 **모두 정확히** 대조합니다(부분 문자열·`startsWith`만으로 판별하지 않음). `:id`는 경로 한 칸(영문·숫자·`_`·`-` 1~64자)이며 `export` 등 기능 이름 예약어는 ID로 받지 않습니다. 쿼리로는 기능을 고르지 않으므로 `queryLength`가 0이 아니면 거부합니다.
+
+| 자원 | 서비스 | route(계약 모양) | 자원 ID | 판정기 | 최종 API |
+|---|---|---|---|---|---|
+| 내 메모 목록 | notes | `GET /notes` | `note_list` | 허용 | `GET /api/my-notes`: `owner_id = 검증된 사용자` 조건 |
+| 내 메모 한 건 읽기 | notes | `GET /notes/:id` | `note:<id>` | 허용 | `GET /api/my-notes/:id`: `id`+`owner_id` 조건, 불일치 404 |
+| 내 메모 수정 | notes | `PUT /notes/:id` | `note:<id>` | 허용 | `PUT /api/my-notes/:id`: 같은 조건, 본문은 `title`·`body`만 읽음 |
+| 강사 공지 수정 | announcements | `PUT /announcements/:id` | `announcement:<id>` | **항상 거부**(`zone_not_allowed`, 규칙 `instructor_notice_only`) | 이 저장소에 공지 라우트·저장소 없음 |
+| 그 밖의 경로·메서드·쿼리 | — | — | — | 거부(`starter_not_ready`, 규칙 `starter.deny`) | 405/400/401 |
+
+- **판정 순서**: ① 경로 분류(모르면 거부) → ② 기기 등록·`subjectId`(6단계, 항상 먼저) → ③ 강사 공지는 무조건 거부 → ④ 복합 이상·지역 급변 시 `step_up`(7단계, 재인증 확인 전에는 구역 허용으로 우회 불가) → ⑤ `allow`. 새 규칙 ID: `note_zone`, `instructor_notice_only`. 새 이유 코드 `zone_not_allowed`는 지정된 규약이 없어 제가 정했고, 운영 등록부(`allowedReasonCodes`)에 있는지는 **확인하지 못했습니다**(없으면 엔진이 거부 처리하므로 허용되지는 않음).
+- **판정기가 못 하는 것**: 계약에 메모 소유자·역할 필드가 없고 `subjectId`는 Supabase 사용자 번호와 비교할 수 없는 가명이라, 판정기는 "남의 메모"를 구분하지 못합니다. 이 검사는 판정기가 아니라 **API가** 합니다. 판정기가 보는 `/notes/:id` 모양과 실제 API 경로(`/api/my-notes/:id`)의 연결을 설명한 계약 문서는 없어 같다고 가정하지 않았습니다. 이 앱의 `api/*.mjs`는 `decide()`를 호출하지 않습니다.
+- **API 권한 근거**: 사용자 신원은 `src/notes-auth.mjs`(→ `src/verify-login.mjs`)가 `Authorization` 토큰을 검증해 돌려준 `userId`뿐입니다. 요청 본문·쿼리·헤더의 `owner_id`·`role`은 읽지 않습니다(`PUT`은 `title`·`body`만, `POST`의 소유자는 검증된 ID). 거부 시 서버 로그에 `resource=note:<id> method reason=owner_mismatch|not_found` 한 줄만 남기며 토큰·본문은 기록하지 않습니다. 응답은 두 경우 모두 같은 404입니다.
+- **강사 공지는 구현하지 못했습니다**: 저장소에 공지 자료·강사 역할 저장소가 없고, 판정기 계약에도 강사 권한을 검증해 넘기는 필드가 없습니다. `verify-login.mjs`의 `aleph_role: 'judge'`는 심판 토큰용이라 강사 권한이 아닙니다. 그래서 강사 수정 허용 분기를 만들지 않고(임의 신원 우회 금지) 공지 수정은 판정기에서 항상 거부합니다. 검증된 강사 공지 수정 성공은 **미실행**입니다.
+- **알려진 한계**: `/api/notes`(공용 가상 메모 `t02_vault_notes`)는 4단계에서 설명한 대로 소유자 없는 공용 자료라 로그인한 누구나 읽습니다. 이번 단계에서 바꾸지 않았습니다. 화면 메뉴와 기존 주소·자료·ID는 바꾸지 않았습니다.
+
+**시험(실제 실행)**
+- `npm run test:zones`(신규, `test/zones.test.mjs`): 8건 통과. 판정기 **가상 요청** 4건(자기 메모 읽기·수정·목록 허용 / 공지 수정은 재인증·미등록 기기와 무관하게 거부 / 알 수 없는 경로·`DELETE`·`POST`·쿼리·`export` 거부 / 미등록 기기 거부·복합 이상 `step_up` 유지) + `api/my-notes` 핸들러를 **인메모리 대역**(Supabase·로그인 검증을 흉내 냄)으로 돌린 4건(A 조회·수정 성공, B의 A 메모 조회·수정·삭제 404, 거부 뒤 저장 데이터 불변, B 목록에 A 자료 없음, `owner_id`·`role` 위조해도 소유자 불변, 405/400/401).
+- `npm run decider:test` 4건 통과, `npm run fixture:7` 정상 `allow`·복합 이상 `step_up`, `npm run test:r5` 2 pass.
+- **미실행**: 배포된 실제 API에 A·B 학생 계정으로 보낸 실측, 검증된 강사 계정의 공지 수정(계정·공지 자료 없음), 반 엔진 환경에서의 판정기 호출. 위 결과는 가상 판정·대역 시험이며 실제 API 차단이나 심판 통과의 증거가 아닙니다.
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
 
