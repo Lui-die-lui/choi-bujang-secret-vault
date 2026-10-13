@@ -105,20 +105,36 @@ export default async function handler(request, response) {
     return response.status(409).json({ error: 'backup_verification_failed' });
   }
 
-  // 4) 그 한 행만 되돌립니다: 있으면 내용만 고치고, 지워졌으면 같은 ID·소유자로 다시 넣습니다.
+  // 4) 쓰기 직전에 사본을 한 번 더 읽어 다시 검증합니다. 처음 읽은 사본과 달라졌거나
+  //    없어졌거나 검증에 실패하면 아무것도 쓰지 않고 중단합니다.
+  const { data: recheck, error: recheckError } = await supabase
+    .from(BACKUP_TABLE)
+    .select('note_id, owner_id, title, content, content_sha256')
+    .eq('note_id', id)
+    .eq('owner_id', identity.userId)
+    .maybeSingle();
+  const recheckFailure = recheckError || !recheck ? 'backup_reread_failed'
+    : verifyBackup(recheck, { id, ownerId: identity.userId })
+      ?? (recheck.content_sha256 !== copy.content_sha256 ? 'backup_changed' : null);
+  if (recheckFailure) {
+    log('backup_verification_failed', { reason: recheckFailure });
+    return response.status(409).json({ error: 'backup_verification_failed' });
+  }
+
+  // 5) 그 한 행만 되돌립니다: 있으면 내용만 고치고, 지워졌으면 같은 ID·소유자로 다시 넣습니다.
   const action = current ? 'updated' : 'inserted';
   const { error: writeError } = current
-    ? await supabase.from(TABLE).update({ title: copy.title, content: copy.content })
+    ? await supabase.from(TABLE).update({ title: recheck.title, content: recheck.content })
       .eq('id', id).eq('owner_id', identity.userId)
     : await supabase.from(TABLE)
-      .insert({ id, owner_id: identity.userId, title: copy.title, content: copy.content });
+      .insert({ id, owner_id: identity.userId, title: recheck.title, content: recheck.content });
   if (writeError) {
     console.error('my-notes restore write failed:', writeError.message);
     log('db_error');
     return response.status(500).json({ error: 'notes_write_failed' });
   }
 
-  // 5) 되살린 행을 다시 읽어 사본과 같은지 확인합니다.
+  // 6) 되살린 행을 다시 읽어 사본과 같은지 확인합니다.
   const { data: restored, error: checkError } = await supabase
     .from(TABLE).select('id, owner_id, title, content')
     .eq('id', id).eq('owner_id', identity.userId).maybeSingle();

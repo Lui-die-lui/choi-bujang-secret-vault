@@ -13,14 +13,21 @@ const NOTE_B2 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 // ---- 인메모리 저장소와 로그인 대역 ----
 const tables = { t03_personal_notes: [], t10_note_backups: [] };
 let failTable = null; // 이 표의 다음 요청을 DB 오류로 만든다
+let beforeBackupRead = null;
+let backupReads = 0;
 function query(table) {
   assert.ok(table in tables, table);
-  const source = tables[table];
   const filters = [];
   let op = 'select';
   let patch;
   const run = single => {
     if (failTable === table) return { data: null, error: { message: 'simulated db failure' } };
+    // 사본 표를 n번째로 읽기 직전에 사본을 바꾸는 장치(쓰기 직전 재검증 시험용)
+    if (op === 'select' && table === 't10_note_backups' && beforeBackupRead) {
+      backupReads += 1;
+      beforeBackupRead(backupReads);
+    }
+    const source = tables[table];
     const hit = source.filter(r => filters.every(([k, v]) => r[k] === v));
     if (op === 'insert') {
       const key = table === 't10_note_backups' ? 'note_id' : 'id';
@@ -81,6 +88,8 @@ function call(handler, { method = 'POST', token, query: q = {}, body } = {}) {
 const note = (id, owner, title, content) => ({ id, owner_id: owner, title, content });
 function reset() {
   failTable = null;
+  beforeBackupRead = null;
+  backupReads = 0;
   tables.t03_personal_notes = [note(NOTE_A, A, 'A 제목', 'A 본문'), note(NOTE_B, B, 'B 제목', 'B 본문'),
     note(NOTE_B2, B, 'B 둘째 제목', 'B 둘째 본문')];
   tables.t10_note_backups = tables.t03_personal_notes
@@ -152,6 +161,38 @@ test('복원 중단: 사본이 없거나, 검증에 실패하거나, 사본을 �
     assert.equal(JSON.stringify(tables.t03_personal_notes), snapshot, name);
   }
   assert.doesNotMatch(logs.text(), /B 본문|변조|바뀐 사본/u);
+  logs.done();
+});
+
+test('복원 중단: 쓰기 직전에 사본을 다시 읽어, 그사이 바뀌었거나 없어졌으면 쓰지 않는다', async () => {
+  const logs = quiet();
+  const copyOf = id => tables.t10_note_backups.find(r => r.note_id === id);
+  const changes = [
+    ['두 번째 읽기 전에 사본 내용과 해시가 함께 바뀜', () => {
+      Object.assign(copyOf(NOTE_B), backupRow({ id: NOTE_B, ownerId: B, title: '바꿔친 제목', content: '바꿔친 본문' }));
+    }],
+    ['두 번째 읽기 전에 사본 내용만 바뀜', () => { copyOf(NOTE_B).content = '바꿔친 본문'; }],
+    ['두 번째 읽기 전에 사본이 없어짐', () => {
+      tables.t10_note_backups = tables.t10_note_backups.filter(r => r.note_id !== NOTE_B);
+    }],
+  ];
+  for (const [name, change] of changes) {
+    reset();
+    Object.assign(row(NOTE_B), { title: '변조 제목', content: '변조 본문' });
+    beforeBackupRead = n => { if (n === 2) change(); };
+    const snapshot = JSON.stringify(tables.t03_personal_notes);
+    const out = await call(restore, { token: 'token-b', query: { id: NOTE_B } });
+    assert.equal(backupReads, 2, name); // 사본을 실제로 두 번 읽었다
+    assert.equal(out.status, 409, name);
+    assert.deepEqual(out.body, { error: 'backup_verification_failed' }, name);
+    assert.equal(JSON.stringify(tables.t03_personal_notes), snapshot, name);
+  }
+  // 정상 복원도 사본을 두 번 읽는다
+  reset();
+  beforeBackupRead = () => {};
+  assert.equal((await call(restore, { token: 'token-b', query: { id: NOTE_B } })).status, 200);
+  assert.equal(backupReads, 2);
+  assert.doesNotMatch(logs.text(), /바꿔친|변조/u);
   logs.done();
 });
 

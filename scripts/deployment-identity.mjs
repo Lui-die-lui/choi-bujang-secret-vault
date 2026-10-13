@@ -18,6 +18,10 @@ export function deploymentIdentity(env, config) {
       || !/^[A-Z0-9_]{1,80}$/u.test(config.sampleMarker)) {
     throw new Error('배포 식별 정보를 확인할 수 없습니다. Vercel 시스템 환경변수와 1단계 시작 틀을 확인하세요.');
   }
+  // 10단계: 복원 경로를 배포 정보에도 싣습니다(허용 경로에 있는 값일 때만).
+  const restoreRoute = config.step >= 10 && typeof config.restoreRoute === 'string'
+    && Array.isArray(config.allowedRoutes) && config.allowedRoutes.includes(config.restoreRoute)
+    ? { restoreRoute: config.restoreRoute } : {};
   return {
     schema: 'aleph.defense.deployment.v1',
     step: config.step,
@@ -28,5 +32,6 @@ export function deploymentIdentity(env, config) {
     sampleMarker: config.sampleMarker,
     allowedRoutes: Array.isArray(config.allowedRoutes) ? config.allowedRoutes : [],
     originalApiUrl: typeof config.originalApiUrl === 'string' ? config.originalApiUrl : null,
+    ...restoreRoute,
   };
 }
