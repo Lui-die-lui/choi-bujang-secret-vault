@@ -2,8 +2,8 @@
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
 //
 // 6단계: 기기 등록 조건(device_registered). docs/DECIDER_REQUEST.md 계약에 있는
-// request.deviceRegistered·request.subjectId만 쓰고, 계약에 없는 request.device 등은
-// 만들어 쓰지 않습니다. "내 자료실 읽기"는 service 'notes' + method 'GET'입니다.
+// request.deviceRegistered·request.subjectId만 쓰고, 계약에 없는 이름(기기·신원·역할·위치를
+// 따로 담은 값)은 만들어 쓰지 않습니다. "내 자료실 읽기"는 service 'notes' + method 'GET'입니다.
 // 그 외 요청은 starter.deny로 거부합니다. deviceId와 subjectId의 결속은 계약에
 // 필드가 없어 여기서 재검증하지 않습니다(반 엔진의 책임).
 //
@@ -83,8 +83,10 @@ function hasSubject(request) {
   return typeof request.subjectId === 'string' && request.subjectId.trim() !== '';
 }
 
+// 요청이 객체가 아니어도(잘못된 가상 요청) 예외 없이 다섯 항목의 거부 응답을 돌려줍니다.
 function response(request, decision, reasonCode, ruleIds) {
-  return { schema: 'aleph.decision.v1', requestId: request.requestId, decision, reasonCode, ruleIds };
+  const requestId = isObject(request) && request.requestId !== undefined ? request.requestId : null;
+  return { schema: 'aleph.decision.v1', requestId, decision, reasonCode, ruleIds };
 }
 
 // 엔진이 검증해 넘긴 추가 인증 완료 값만 인정합니다(브라우저 값·subjectId 존재는 근거가 아님).

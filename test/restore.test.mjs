@@ -57,6 +57,11 @@ function query(table) {
 mock.module('@supabase/supabase-js', {
   namedExports: { createClient: () => ({ from: query }) },
 });
+// 11단계 기기 확인 관문은 이 시험의 대상이 아니라서 "등록 기기로 확인됨" 대역으로 둡니다
+// (관문 자체는 test/device.test.mjs에서 확인).
+mock.module(new URL('../src/device-registry.mjs', import.meta.url).href, {
+  namedExports: { requireRegisteredDevice: async () => ({ ok: true }) },
+});
 mock.module(new URL('../src/notes-auth.mjs', import.meta.url).href, {
   namedExports: {
     verifyRequestLogin: async request => {

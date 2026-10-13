@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { describeAuthorization } from '../../src/auth-diagnostics.mjs';
+import { requireRegisteredDevice } from '../../src/device-registry.mjs';
 import { BACKUP_TABLE, backupRow } from '../../src/note-backup.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
 
@@ -35,6 +36,10 @@ export default async function handler(request, response) {
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
+
+  // 11단계: 서버가 이 기기를 등록 기기로 확인하기 전에는 자료를 조회하거나 바꾸지 않습니다.
+  const device = await requireRegisteredDevice({ request, identity, supabase, secret: supabaseSecretKey });
+  if (!device.ok) return response.status(device.status).json(device.body);
 
   if (request.method === 'GET') {
     const { data, error } = await supabase

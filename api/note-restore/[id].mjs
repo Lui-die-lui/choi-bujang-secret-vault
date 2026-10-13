@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { requireRegisteredDevice } from '../../src/device-registry.mjs';
 import { BACKUP_TABLE, contentHash, verifyBackup } from '../../src/note-backup.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
 
@@ -129,6 +130,13 @@ export default async function handler(request, response) {
   supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
+
+  // 11단계: 서버가 이 기기를 등록 기기로 확인하기 전에는 사본·메모를 조회하거나 바꾸지 않습니다.
+  const device = await requireRegisteredDevice({ request, identity, supabase, secret: supabaseSecretKey });
+  if (!device.ok) {
+    log('device_not_registered');
+    return response.status(device.status).json(device.body);
+  }
 
   // 1) 사본을 읽어 검증합니다: 본인 소유 사본만, ID·소유자·내용 해시가 모두 맞아야 합니다.
   const first = await readVerifiedBackup(supabase, id, identity.userId);

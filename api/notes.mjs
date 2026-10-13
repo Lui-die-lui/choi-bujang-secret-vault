@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { describeAuthorization } from '../src/auth-diagnostics.mjs';
+import { requireRegisteredDevice } from '../src/device-registry.mjs';
 import { verifyRequestLogin } from '../src/notes-auth.mjs';
 
 // 2단계: 가상 메모를 코드 밖(Supabase, t02_vault_notes)으로 옮기고
@@ -32,6 +33,10 @@ export default async function handler(request, response) {
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
+
+  // 11단계: 서버가 이 기기를 등록 기기로 확인하기 전에는 자료를 조회하지 않습니다.
+  const device = await requireRegisteredDevice({ request, identity: auth.identity, supabase, secret: supabaseSecretKey });
+  if (!device.ok) return response.status(device.status).json(device.body);
 
   // 8단계: "공용 자료"를 데이터로 정의합니다 — owner_id가 비어 있는 행만 돌려줍니다.
   // t02_vault_notes에 소유자가 있는 행이 생겨도 이 공용 경로로는 나가지 않습니다.

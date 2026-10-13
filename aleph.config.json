@@ -1,5 +1,5 @@
 {
-  "step": 10,
+  "step": 11,
   "repoUrl": "https://github.com/Lui-die-lui/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-lilac.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -18,6 +18,9 @@
     "DELETE /api/my-notes/:id",
     "GET /api/note-restore/:id",
     "POST /api/note-restore/:id",
+    "GET /api/device/challenge",
+    "POST /api/device/request",
+    "POST /api/device/verify",
     "POST /api/auth/login",
     "POST /api/auth/refresh",
     "POST /api/auth/logout"

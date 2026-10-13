@@ -1,0 +1,15 @@
+{
+  "name": "BYTE BACK 자료실",
+  "short_name": "자료실",
+  "description": "가상 메모 자료실 접속 화면. 자료는 서버가 로그인과 등록 기기를 확인한 뒤에만 열립니다.",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101a28",
+  "theme_color": "#101a28",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
