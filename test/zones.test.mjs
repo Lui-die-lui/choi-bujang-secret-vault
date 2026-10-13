@@ -12,22 +12,29 @@ const NOTE_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 // ---- 인메모리 저장소와 로그인 대역 ----
 const rows = [];
+const sharedRows = []; // t02_vault_notes 대역
 const resetRows = () => {
+  sharedRows.length = 0;
+  sharedRows.push({ id: 1, owner_id: null, title: '공용 제목', content: '공용 본문' });
+  sharedRows.push({ id: 2, owner_id: A, title: '소유자 있는 행', content: 'A만 볼 본문' });
   rows.length = 0;
   rows.push({ id: NOTE_A, owner_id: A, title: 'A 제목', content: 'A 본문', created_at: 1 });
   rows.push({ id: NOTE_B, owner_id: B, title: 'B 제목', content: 'B 본문', created_at: 2 });
 };
 function query(table) {
-  assert.equal(table, 't03_personal_notes');
+  assert.ok(['t03_personal_notes', 't02_vault_notes'].includes(table));
+  const source = table === 't02_vault_notes' ? sharedRows : rows;
   const filters = [];
   let op = 'select';
   let patch;
   let single = false;
-  const pick = row => ({ id: row.id, title: row.title, content: row.content });
+  const pick = table === 't02_vault_notes'
+    ? row => ({ title: row.title, content: row.content })
+    : row => ({ id: row.id, title: row.title, content: row.content });
   const run = () => {
-    const hit = rows.filter(r => filters.every(([k, v]) => r[k] === v));
+    const hit = source.filter(r => filters.every(([k, v]) => r[k] === v));
     if (op === 'update') hit.forEach(r => Object.assign(r, patch));
-    if (op === 'delete') hit.forEach(r => rows.splice(rows.indexOf(r), 1));
+    if (op === 'delete') hit.forEach(r => source.splice(source.indexOf(r), 1));
     const data = single ? (hit[0] ? pick(hit[0]) : null) : hit.map(pick);
     return { data, error: null };
   };
@@ -41,6 +48,7 @@ function query(table) {
       return { select: () => ({ single: async () => ({ data: { id: full.id }, error: null }) }) };
     },
     eq: (k, v) => { filters.push([k, v]); return builder; },
+    is: (k, v) => { filters.push([k, v]); return builder; },
     order: () => builder,
     maybeSingle: async () => { single = true; return run(); },
     then: (resolve, reject) => Promise.resolve(run()).then(resolve, reject),
@@ -65,6 +73,7 @@ mock.module(new URL('../src/notes-auth.mjs', import.meta.url).href, {
 process.env.SUPABASE_URL = 'https://example.invalid';
 process.env.SUPABASE_SECRET_KEY = 'test-only-not-a-real-key';
 
+const { default: shared } = await import('../api/notes.mjs');
 const { default: byId } = await import('../api/my-notes/[id].mjs');
 const { default: list } = await import('../api/my-notes/index.mjs');
 const { decide, RULE_IDS } = await import('../src/decider.mjs');
@@ -136,6 +145,21 @@ test('API: 허용하지 않은 메서드·잘못된 ID·토큰 없음은 거부�
   assert.equal((await call(byId, { query: { id: NOTE_A } })).status, 401);
 });
 
+test('공용 /api/notes: 소유자 없는 공용 행만 나가고, 개인 메모 테이블·소유자 있는 행은 안 나간다', async () => {
+  resetRows();
+  const out = await call(shared, { token: 'token-b' });
+  assert.equal(out.status, 200);
+  assert.deepEqual(out.body.notes, [{ title: '공용 제목', content: '공용 본문' }]);
+  const text = JSON.stringify(out.body);
+  for (const secret of ['A 제목', 'A 본문', 'B 제목', 'B 본문', '소유자 있는 행', 'A만 볼 본문']) {
+    assert.ok(!text.includes(secret), secret);
+  }
+  assert.equal((await call(shared, {})).status, 401);
+  for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
+    assert.equal((await call(shared, { method, token: 'token-b' })).status, 405);
+  }
+});
+
 // ---- 판정기(가상 요청) ----
 const base = (over = {}) => ({
   schema: 'aleph.decision.v1', requestId: randomUUID(), classId: 'c', projectId: 'p',
@@ -150,6 +174,16 @@ const verdict = async over => (await decide(base(over))).decision;
 const composite = { signals: { source: 'judge_fixture', region: 'local', network: 'unusual', hour: 3 },
   recentEvents: [{ kind: 'risk_signal', ageSeconds: 60, count: 20 }] };
 
+test('판정기: 소유자 구분은 미구현 — 같은 모양의 다른 자료 ID도 구분 없이 허용한다(API가 막음)', async () => {
+  // 계약에 소유자·역할 필드가 없어 판정기는 A의 메모와 B의 메모를 구분할 수 없다.
+  // 이 시험은 그 한계를 그대로 고정해 두어, 판정기가 소유자를 막는다고 오해하지 않게 한다.
+  const mine = await decide(base({ path: `/notes/${NOTE_A}`, method: 'PUT', route: 'PUT /notes/:id' }));
+  const others = await decide(base({ path: `/notes/${NOTE_B}`, method: 'PUT', route: 'PUT /notes/:id',
+    subjectId: 'learner_other' }));
+  assert.equal(mine.decision, 'allow');
+  assert.equal(others.decision, 'allow');
+});
+
 test('판정기: 자기 메모 읽기·수정은 허용, 목록은 허용', async () => {
   assert.equal(await verdict({}), 'allow');
   assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id' }), 'allow');
@@ -160,6 +194,7 @@ test('판정기: 강사 공지 수정은 학생·재인증과 관계없이 거�
   const notice = { service: 'announcements', method: 'PUT', path: '/announcements/n1',
     route: 'PUT /announcements/:id' };
   assert.equal(await verdict(notice), 'deny');
+  assert.equal((await decide(base(notice))).reasonCode, 'starter_not_ready');
   assert.equal(await verdict({ ...notice, stepUp: { verified: true, authAgeSeconds: 5 } }), 'deny');
   assert.equal(await verdict({ ...notice, deviceRegistered: false }), 'deny');
   assert.equal(await verdict({ ...notice, method: 'GET', route: 'GET /announcements/:id' }), 'deny');

@@ -17,8 +17,11 @@
 // 정확히 대조해 자원 ID(note:<id> / announcement:<id>)를 만들고, 알 수 없는 경로·
 // 허용하지 않은 메서드는 거부합니다. 이 판정기는 메모의 소유자나 강사 여부를 알 수
 // 없습니다(계약에 소유자·역할 필드가 없고 subjectId는 Supabase 사용자 번호와 비교할 수
-// 없는 가명입니다). 그래서 "남의 메모 거부"는 최종 자료 API(api/my-notes)의 owner_id
-// 조건이 맡고, 강사 공지 수정은 신뢰할 강사 권한 정보가 없으므로 항상 거부합니다.
+// 없는 가명입니다). 판정기의 소유자 구분은 미구현입니다 — A의 메모와 B의 메모 요청을
+// 같은 route·id 모양이면 똑같이 허용합니다. "남의 메모 거부"는 최종 자료 API
+// (api/my-notes)의 owner_id 조건만이 맡고, 강사 공지 수정은 신뢰할 강사 권한 정보가
+// 없으므로 항상 거부합니다. 'announcements' 서비스·경로 이름은 제공 자료에 정의가
+// 없는 이 코드의 가정입니다.
 export const RULE_IDS = Object.freeze([
   'starter.deny', 'device_registered', 'step_up_required', 'region_changed',
   'note_zone', 'instructor_notice_only',
@@ -131,7 +134,9 @@ export async function decide(request) {
   // 2) 강사 공지: 계약에 강사 권한을 검증해 넘기는 필드가 없어 항상 거부합니다.
   //    일반 학생·재인증 여부와 관계없이 허용 분기가 없습니다.
   if (zone.kind === 'announcement') {
-    return response(request, 'deny', 'zone_not_allowed', ['instructor_notice_only']);
+    // 공지 서비스·경로 이름과 전용 이유 코드는 제공 자료에 정의가 없어, 시작 틀이 이미
+    // 쓰는 starter_not_ready로 거부합니다(새 이유 코드를 만들지 않음).
+    return response(request, 'deny', 'starter_not_ready', ['instructor_notice_only']);
   }
   // 3) 복합 이상 접속은 추가 확인 전까지 자료를 주지 않습니다(영구 차단 아님).
   const anomalyRule = assessCompositeAnomaly(request);

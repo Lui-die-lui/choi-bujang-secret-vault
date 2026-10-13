@@ -27,9 +27,13 @@ export default async function handler(request, response) {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
 
+  // 8단계: "공용 자료"를 데이터로 정의합니다 — owner_id가 비어 있는 행만 돌려줍니다.
+  // t02_vault_notes에 소유자가 있는 행이 생겨도 이 공용 경로로는 나가지 않습니다.
+  // 개인 메모는 별도 테이블(t03_personal_notes)이며 이 경로는 읽지 않습니다.
   const { data, error } = await supabase
     .from('t02_vault_notes')
     .select('title, content')
+    .is('owner_id', null)
     .order('id', { ascending: true });
 
   if (error) {
