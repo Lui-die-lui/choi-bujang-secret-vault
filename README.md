@@ -2,7 +2,7 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 지금 작동하는 기능 (9단계 저장점)
+## 지금 작동하는 기능 (10단계 저장점)
 
 - 화면(`/`)에서 이메일·비밀번호로 로그인/로그아웃할 수 있습니다. 로그인·세션 갱신·로그아웃은 전부 서버 함수(`/api/auth/login`·`/api/auth/refresh`·`/api/auth/logout`)가 공식 Supabase SDK로 처리하며, **화면 코드에는 Supabase 프로젝트 URL이나 공개 키가 전혀 없습니다.**
 - 로그인해야만 `/api/notes`(2단계 공개 가상 메모 4건, `t02_vault_notes`, 소유자 없는 공용 자료)가 보입니다. 로그아웃하면 화면의 메모도 바로 지워집니다.
@@ -14,6 +14,7 @@
 - **7단계**: 같은 판정기가 "평소와 다른 시각 + 처음 보는 네트워크 + 갑작스러운 대량 자료 읽기"가 겹친 가상 접속 사건을 `step_up`(추가 확인)으로 보냅니다. 아래 "7단계" 절 참고. 실제 자료 차단·재로그인 후 허용은 **미실행**입니다.
 - **8단계**: 판정기가 자료를 구역(자원 ID)으로 나눕니다 — 메모는 `note:<id>`, 강사 공지는 `announcement:<id>`. 알 수 없는 경로·메서드는 거부하고, 강사 공지 수정은 항상 거부합니다(강사 권한을 검증해 주는 계약이 없음). **판정기의 소유자(A/B) 구분은 미구현**이며 남의 메모 차단은 최종 API의 `owner_id` 조건만 맡습니다. 아래 "8단계" 절 참고.
 - **9단계**: `src/detect.mjs`의 `detect(events)`가 같은 가명 사용자의 `GET` 사건이 10분 안에 120건을 넘을 때만 `propose_revocation`(이유 코드 `burst_read`)을 **제안**합니다. 그 밖에는 `observe`입니다. 실제 회수·권한 변경은 하지 않습니다. 아래 "9단계" 절 참고.
+- **10단계**: `POST /api/my-notes/:id/restore`가 비공개 사본(`t10_note_backups`)에서 로그인한 본인의 메모 한 건만 되살립니다(ID·소유자·내용 해시 대조, 하나라도 다르면 중단). `npm run policy:diff` / `npm run policy:restore -- --confirm`은 시험 정책(`src/decider.mjs`)을 검증된 안전 사본과 비교·복원합니다. **`supabase/t10_note_backups.local.sql`을 실행해야 배포본에서 작동합니다.** 아래 "10단계" 절 참고.
 - **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
 - **남은 약점**: `/api/notes`(공용 자료)는 로그인만 확인하고 소유자 개념이 없습니다(의도된 설계, 아래 4단계 절 참고). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
@@ -212,6 +213,57 @@ git show HEAD:public/data.json
 - 기존 회귀: `npm run decider:test` 4건, `npm run test:zones` 13건, `npm run test:r5` 2건 통과.
 
 **미실행**: 운영 반 엔진의 사건 전달, 회수 제안 집행, 회수 뒤 재접속 차단, 경과 시간 측정은 연결·확인하지 않았습니다. 이 앱의 `api/*.mjs`는 `detect()`를 호출하지 않습니다.
+
+## 10단계: 백업에서 자료실을 되살립니다
+
+**시작 상태**: 저장소(모든 원격 브랜치 포함)에 정책 사본·메모 사본·감사 기록 표·백업 검증 방식이 없었습니다(`aleph.config.json`의 `restoreRoute: null`뿐). CHECK.md에도 사건 자료는 없습니다. 그래서 이미 있는 구조(자료 API의 로그인·소유자 조건, Git 커밋, `*.local.sql` 관례)만 써서 아래를 새로 만들었습니다. `src/decider.mjs`와 기존 API의 응답은 바꾸지 않았습니다.
+
+### 메모 한 건 복원 — 서비스와 경로
+
+| 항목 | 값 |
+|---|---|
+| 서비스 | 이 앱의 Vercel 서버 함수 `api/my-notes/[id]/restore.mjs` |
+| 경로 | `POST /api/my-notes/:id/restore` (`aleph.config.json`의 `restoreRoute`·`allowedRoutes`에 기록) |
+| 로그인 | 다른 자료 API와 같은 `Authorization: Bearer <토큰>` 검증(`src/notes-auth.mjs` → `src/verify-login.mjs`) |
+| 사본 | Supabase 표 `public.t10_note_backups`(`note_id`·`owner_id`·`title`·`content`·`content_sha256`), `service_role`만 접근 |
+| 성공 응답 | `200 {"id","restored":true,"contentSha256"}` — 제목·본문은 응답에 넣지 않음 |
+
+- **사본이 생기는 때**: 메모를 처음 만들 때(`POST /api/my-notes`) 서버가 한 번 남깁니다. 이후 수정·삭제로는 사본이 바뀌지 않아, 변조된 내용이 사본을 덮어쓰지 않습니다. 사본을 남기지 못해도 메모 추가는 그대로 성공합니다(사유만 기록).
+- **복원 순서**: ① 로그인 확인 → ② 본인 소유 사본 읽기(없거나 남의 것이면 404) → ③ 사본의 메모 ID·소유자·내용 해시 대조(다르면 409 `backup_verification_failed`) → ④ 같은 ID가 다른 소유자의 행이면 중단(409) → ⑤ 그 한 행만 수정하거나, 지워졌으면 같은 ID·소유자로 다시 추가 → ⑥ 다시 읽어 해시가 사본과 같은지 확인. 사본 표를 읽지 못하면 500으로 중단합니다.
+- **범위**: 바꾸는 것은 검증된 사용자 본인의 지정한 메모 한 행뿐입니다. 요청 본문은 읽지 않아 대상·소유자·내용을 바꿀 수 없습니다. 다른 메모, 다른 계정 자료, 사본 표, 로그는 건드리지 않습니다. 코드로 "시험 계정 B"만 허용하도록 묶지는 않았고(본인 소유 조건), 확인은 B의 메모로 합니다.
+- **내용 해시**: `sha256(<제목 바이트 길이> + ':' + 제목 + 본문)` (`src/note-backup.mjs`의 `contentHash`). SQL의 기존 메모 사본 만들기 식과 같은 모양입니다.
+- **감사 기록**: 이 저장소에는 감사 기록 표가 없습니다. 복원 결과는 서버 로그에 `my-notes.restore` 한 줄(JSON: `outcome`, 사용자 ID 지문 12자리, `resource`, `action`)로만 남기며 제목·본문·토큰은 넣지 않습니다. 기존 로그 줄은 바꾸지 않았습니다.
+- **학생이 직접 할 일**: Supabase SQL Editor에서 `supabase/t10_note_backups.local.sql`을 한 번 실행합니다(로컬 전용 파일, Git 미포함). 표를 만들고 권한을 닫은 뒤, 지금 있는 메모의 사본을 한 번 만듭니다. **실행 전에는 배포본의 복원 요청이 500 `backup_unavailable`로 중단됩니다.**
+- **알려진 한계**: 사본은 처음 만든 내용이라, 복원하면 그 뒤의 정상 수정도 함께 되돌아갑니다. `restoreRoute`의 표기(`POST /api/my-notes/:id/restore`)는 `allowedRoutes`와 같은 모양으로 적은 제 판단이며, 심판이 기대하는 형식·응답 모양에 대한 공식 자료는 찾지 못했습니다.
+
+### 시험 정책 비교·복원
+
+- **안전 정책 사본**: `backup/policy-safe.json`이 가리키는 Git 커밋 `6666eeb`(8단계 저장점)의 `src/decider.mjs`와 그 SHA-256. 사본 기록이 없거나, 형식이 틀리거나, Git에서 읽지 못하거나, SHA-256이 다르면 아무것도 바꾸지 않고 중단합니다(종료 코드 1).
+- **`npm run policy:diff`**: 복원할 버전, 사본 검증 결과, 달라진 규칙 이름, 사라질 줄·돌아올 줄을 보여 주기만 합니다.
+- **`npm run policy:restore -- --confirm`**: 같은 내용을 먼저 보여 준 뒤 `src/decider.mjs` 한 파일만 안전 버전으로 되돌립니다. `--confirm`이 없으면 미리보기만 합니다. 다른 파일, Git 커밋·로그(이력), 배포된 앱, 반 엔진의 운영 정책에는 접근하지 않고 `git reset`도 쓰지 않습니다.
+- **한계**: 여기서 "시험 정책"은 이 폴더의 판정기 파일입니다. 사본 기록과 스크립트가 같은 저장소에 있어, 둘을 함께 바꾼 변조는 이 방법으로 알아채지 못합니다. 운영 엔진의 정책 저장소는 이 저장소에서 볼 수 없습니다.
+
+### 복구 뒤 다시 확인하는 순서 (1~9단계)
+
+아래 순서대로 실행합니다. "이번 실행"은 이 저장점에서 실제로 돌린 결과입니다.
+
+| 순서 | 확인 | 명령·요청 | 정상 결과 / 거부되어야 할 결과 | 이번 실행 |
+|---|---|---|---|---|
+| 1 | 정책 사본 검증·차이 | `npm run policy:diff` | "SHA-256 일치", "차이 없음" | 실행 — 일치, 차이 없음 |
+| 2 | 메모 복원(대역) | `npm run test:restore` | 5건 통과: B의 변조·삭제 메모가 사본과 같은 ID·소유자·해시로 복원 / 사본 없음·해시 불일치·남의 메모·비로그인은 중단 | 실행 — 5건 통과 |
+| 3 | 1~2단계 공개 자료 | `npm run bundle`의 직접 점검(`/data.json`) | 메모 0건 | 실행 — 아래 묶음 결과 참고 |
+| 4 | 3~5단계 로그인·직접 접근 | `npm run bundle`의 직접 점검 | 비로그인 `/api/notes`·`/api/my-notes` 401, anon 키 직접 조회·추가 401 | 실행 — 아래 묶음 결과 참고 |
+| 5 | 4·8단계 소유자·구역 | `npm run test:zones` | 13건 통과: A 자기 메모 허용 / B의 A 메모 404, 목록 경로·공지 쓰기 거부 | 실행 — 13건 통과 |
+| 6 | 6·7단계 기기·추가 확인 | `npm run decider:test`, `npm run fixture:7` | 정상 `allow` / 미등록 `deny`, 복합 이상 `step_up` | 실행 — 4건 통과, `allow`·`step_up` |
+| 7 | 9단계 탐지 | `npm run detect:test` | 30건·120건 `observe` / 121건·200건 `propose_revocation` | 실행 — 6건 통과 |
+| 8 | 기본 동작 | `npm run test:r5` | 2 pass | 실행 — 2 pass |
+| 9 | 배포본에서 B의 메모 변조→복원 | B로 로그인해 메모 추가 → 수정 → `POST /api/my-notes/<id>/restore` → 조회 | 처음 내용으로 돌아옴 / A의 ID로 복원 요청은 404 | **미실행** (SQL 실행·배포·시험 계정 토큰 필요) |
+| 10 | 배포본에서 B의 메모 삭제→복원 | 삭제 → 복원 → 조회 | 같은 ID로 다시 보임 | **미실행** |
+| 11 | 배포본 화면 | 로그인 → "내 메모" 추가·수정·삭제 | 기존대로 작동 | **미실행** |
+
+**정책 복원 시험(실제 실행)**: 시험용으로 판정기에 변조 세 곳(목록 경로 다시 열기, 공지 거부 분기 끄기, 규칙 이름 하나 지우기)을 넣자 `npm run policy:diff`가 사라질 줄 3개·돌아올 줄 2개·돌아올 규칙 `instructor_notice_only`를 보여 줬고 `npm run test:zones`가 2건 실패했습니다. `npm run policy:restore -- --confirm` 뒤에는 차이 없음, `test:zones` 13건 통과, Git 변경 없음, 커밋 수 그대로였습니다. 사본 기록 없음·SHA-256 불일치·없는 버전 세 경우는 모두 중단되고 변조 상태가 그대로 남았습니다.
+
+위 결과는 로컬 가상 요청·인메모리 대역 시험이며 실제 DB 복원이나 심판 통과의 증거가 아닙니다.
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
 

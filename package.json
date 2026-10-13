@@ -11,6 +11,9 @@
     "detect:test": "node scripts/detect-test.mjs",
     "fixture:7": "node scripts/fixture-7.mjs",
     "check:page": "node scripts/zone-check-page.mjs",
+    "policy:diff": "node scripts/policy-restore.mjs",
+    "policy:restore": "node scripts/policy-restore.mjs",
+    "test:restore": "node --experimental-test-module-mocks --test test/restore.test.mjs",
     "xdr:run": "node xdr/run.mjs",
     "xdr:sync": "node xdr/sync.mjs"
   },

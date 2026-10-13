@@ -20,7 +20,10 @@ export async function runAttackChecks(config) {
   // 9단계: 탐지 규칙(burst_read)과 회수 제안은 src/detect.mjs가 결과만 돌려주고 이 앱의
   // api/*.mjs가 호출하지 않아 실제 HTTP로 점검할 길이 없습니다(npm run detect:test 가상
   // 사건 연습만 실행, 운영 엔진의 사건 전달·회수는 미실행).
-  if (![5, 6, 7, 8, 9].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  // 10단계: 복원 경로(POST /api/my-notes/:id/restore)는 비로그인 거부만 실제 HTTP로
+  // 점검합니다. 시험 계정 B의 변조·삭제 뒤 복원은 이 점검에 계정 토큰을 넣지 않으므로
+  // 미실행입니다(npm run test:restore 인메모리 대역으로만 확인).
+  if (![5, 6, 7, 8, 9, 10].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -46,9 +49,9 @@ export async function runAttackChecks(config) {
   }
   const dataLeaked = (dataNoteCount ?? 0) > 0;
 
-  async function checkAnonymousRejected(path) {
+  async function checkAnonymousRejected(path, method = 'GET') {
     const response = await fetch(new URL(path, app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
+      method, redirect: 'error', signal: AbortSignal.timeout(10000),
     });
     let isJson = false;
     try {
@@ -63,6 +66,9 @@ export async function runAttackChecks(config) {
 
   const notesCheck = await checkAnonymousRejected('/api/notes');
   const myNotesCheck = await checkAnonymousRejected('/api/my-notes');
+  // 10단계: 실제 자료가 아닌 고정 가상 ID로 비로그인 복원 요청을 보냅니다.
+  const restoreCheck = config.step >= 10 ? await checkAnonymousRejected(
+    '/api/my-notes/00000000-0000-4000-8000-000000000000/restore', 'POST') : null;
 
   // 5단계: 원본 Supabase 자료 API(aleph.config.json의 originalApiUrl)를
   // 우리 서버를 거치지 않고 anon 키로 직접 조회·수정해도 거부되어야 합니다.
@@ -117,6 +123,13 @@ export async function runAttackChecks(config) {
         ? `비로그인 요청이 거부됨 (HTTP ${myNotesCheck.status}, JSON 응답)`
         : `비로그인 요청이 거부되지 않음 (HTTP ${myNotesCheck.status}, JSON 응답 ${myNotesCheck.isJson})`,
     },
+    ...(restoreCheck ? [{
+      attackId: 'anonymous_note_restore_denied',
+      expected: '비로그인 POST /api/my-notes/:id/restore는 401 또는 403과 JSON 오류로 거부되어야 함',
+      observed: restoreCheck.rejected && restoreCheck.isJson
+        ? `비로그인 복원 요청이 거부됨 (HTTP ${restoreCheck.status}, JSON 응답)`
+        : `비로그인 복원 요청이 기대대로 거부되지 않음 (HTTP ${restoreCheck.status}, JSON 응답 ${restoreCheck.isJson})`,
+    }] : []),
     {
       attackId: 'anon_direct_original_api_read_denied',
       expected: 'anon 키로 원본 Supabase 자료 API(originalApiUrl)를 직접 조회하면 거부되어야 함',

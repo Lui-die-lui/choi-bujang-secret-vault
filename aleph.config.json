@@ -1,5 +1,5 @@
 {
-  "step": 9,
+  "step": 10,
   "repoUrl": "https://github.com/Lui-die-lui/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-lilac.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -16,10 +16,11 @@
     "GET /api/my-notes/:id",
     "PUT /api/my-notes/:id",
     "DELETE /api/my-notes/:id",
+    "POST /api/my-notes/:id/restore",
     "POST /api/auth/login",
     "POST /api/auth/refresh",
     "POST /api/auth/logout"
   ],
   "originalApiUrl": "https://iyxvvnrekxthoixcdlht.supabase.co/rest/v1/t03_personal_notes",
-  "restoreRoute": null
+  "restoreRoute": "POST /api/my-notes/:id/restore"
 }

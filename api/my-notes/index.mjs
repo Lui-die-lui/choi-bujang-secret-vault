@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { describeAuthorization } from '../../src/auth-diagnostics.mjs';
+import { BACKUP_TABLE, backupRow } from '../../src/note-backup.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
 
 const TABLE = 't03_personal_notes';
@@ -68,6 +69,15 @@ export default async function handler(request, response) {
     if (error) {
       console.error('my-notes create failed:', error.message);
       return response.status(500).json({ error: 'notes_write_failed' });
+    }
+    // 10단계: 처음 만든 내용을 비공개 사본으로 한 번 남깁니다(복원 경로의 기준).
+    // 사본을 남기지 못해도 메모 추가는 그대로 성공시키고, 사유만 기록합니다(본문 없음).
+    try {
+      const { error: backupError } = await supabase.from(BACKUP_TABLE)
+        .insert(backupRow({ id: data.id, ownerId: identity.userId, title, content }));
+      if (backupError) console.error('my-notes backup failed:', backupError.message);
+    } catch {
+      console.error('my-notes backup failed: unexpected_error');
     }
     return response.status(201).json({ id: data.id });
   }
