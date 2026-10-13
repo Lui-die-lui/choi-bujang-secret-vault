@@ -2,7 +2,7 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 지금 작동하는 기능 (5단계 저장점)
+## 지금 작동하는 기능 (6단계 저장점)
 
 - 화면(`/`)에서 이메일·비밀번호로 로그인/로그아웃할 수 있습니다. 로그인·세션 갱신·로그아웃은 전부 서버 함수(`/api/auth/login`·`/api/auth/refresh`·`/api/auth/logout`)가 공식 Supabase SDK로 처리하며, **화면 코드에는 Supabase 프로젝트 URL이나 공개 키가 전혀 없습니다.**
 - 로그인해야만 `/api/notes`(2단계 공개 가상 메모 4건, `t02_vault_notes`, 소유자 없는 공용 자료)가 보입니다. 로그아웃하면 화면의 메모도 바로 지워집니다.
@@ -10,6 +10,7 @@
 - 개인 메모는 **API 쿼리 조건**(`id`+`owner_id`), **DB RLS 정책**(`auth.uid() = owner_id`), 그리고 **anon·authenticated 직접 테이블 권한 회수**(5단계) 세 겹으로 보호됩니다. 브라우저도 서버 함수만 거치고, Supabase Data API에 직접 접속하는 경로는 공개 키로도 로그인 토큰으로도 막혀 있습니다(`t02_vault_notes`는 2단계부터, `t03_personal_notes`는 4~5단계에 걸쳐).
 - 모든 자료 API는 `src/verify-login.mjs`(미수정)로 `Authorization: Bearer <토큰>`을 검증합니다. 토큰이 없거나 검증 실패 시 메모 없이 401 JSON 오류를 돌려줍니다.
 - `data.json`, `public/data.json`에는 메모가 없습니다(`"notes": []`).
+- **6단계**: `src/decider.mjs`(ALEPH SDP 엔진이 호출하는 ZTNA 판정기)가 "자료실 읽기" 요청(`service: 'notes'`, `method: 'GET'`)에 기기 등록 조건을 겁니다 — `deviceRegistered`가 명시적으로 `true`일 때만 `allow`, 그 외(미등록·값 없음)는 `deny`+`device_not_registered`로 거부합니다. 아래 "6단계: 등록한 기기만 자료실에 들어옵니다" 절 참고.
 - **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
 - **남은 약점**: `/api/notes`(공용 자료)는 로그인만 확인하고 소유자 개념이 없습니다(의도된 설계, 아래 4단계 절 참고). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
@@ -81,6 +82,27 @@ git show HEAD:public/data.json
 **추가 작업(공개 키 제거 보너스)**: 제작1·2와 별개로, 화면 코드에서 Supabase 공개 키(publishable/anon key)를 완전히 제거했습니다. 로그인·세션 갱신·로그아웃을 새 서버 함수 `api/auth/login.mjs`·`api/auth/refresh.mjs`·`api/auth/logout.mjs`로 옮기고(모두 공식 SDK의 `signInWithPassword`/`refreshSession`/`auth.admin.signOut`만 사용, JWT 직접 생성 없음), 화면은 이 서버 함수들을 `fetch`로 호출하도록 바꿨습니다. 세션은 브라우저의 `sessionStorage`에만 보관됩니다. 세 함수 모두 응답에 `Cache-Control: no-store`를 적용했고, 비밀번호·키·토큰 값은 로그에 남기지 않습니다(에러 로그에는 Supabase가 주는 일반 사유 문구만 기록). **참고**: 로그아웃은 해당 세션의 refresh token을 서버에서 즉시 폐기해 재발급을 막지만, 이미 발급된 access token(JWT, 기본 1시간 수명)은 서명 검증상 자연 만료 전까지 유효할 수 있습니다 — Supabase가 매 요청마다 로그아웃 여부를 실시간으로 대조하지는 않기 때문입니다.
 
 **이번 단계로 막은 길**: 로그인한 사람의 진짜 토큰이나 공개 anon 키로 Supabase Data API(`/rest/v1/...`)를 직접 불러 자료에 접근하던 경로가 `t02_vault_notes`·`t03_personal_notes` 모두에서 막혔습니다. 브라우저도 이제 Auth 호출을 제외하면 우리 서버 함수만 거칩니다.
+
+## 6단계: 등록한 기기만 자료실에 들어옵니다
+
+**제작 1(계약 확인)**: `docs/DECIDER_REQUEST.md`를 읽고 "사용자"와 `deviceRegistered`가 어디서 들어오는지 확인했습니다 — 둘 다 `decide(request)`가 반 엔진(ALEPH SDP 엔진)에게서 그대로 받는 같은 요청 객체의 최상위 필드입니다. 사용자 쪽은 직접적인 사용자 식별자가 없고 가명 `request.subjectId`만 있습니다("Supabase 사용자 번호와 직접 비교하지 않습니다", 문서 원문). `request.deviceRegistered`는 불리언이며, 문서 원문: "실제 릴레이는 미등록 기기를 판정기보다 먼저 막습니다. `false`는 심판의 가상 요청에서만 올 수 있습니다." 새 키·인증서는 만들지 않았습니다(이 단계는 값을 읽기만 함).
+
+**제작 2(최소 변경)**: `src/decider.mjs`의 `RULE_IDS`에 `device_registered`를 추가했습니다(`['starter.deny', 'device_registered']`). `decide(request)` 안에서 `request.method === 'GET' && request.service === 'notes'`(로컬 연습 하네스 `scripts/fixture-7.mjs`가 쓰는 실제 요청 모양 그대로 — "내 자료실 읽기")일 때만 기기 등록을 확인합니다: `request.deviceRegistered === true`면 `allow`+`approved`, 그 외(미등록·`false`·값 없음 전부)는 `deny`+`device_not_registered`. 그 외 서비스·동작은 그대로 기존 `starter.deny`/`starter_not_ready`로 거부됩니다(새 규칙을 추가하지 않음). 함수 이름·인자(`decide(request)`)와 응답 다섯 항목(`schema`,`requestId`,`decision`,`reasonCode`,`ruleIds`)은 그대로입니다. 자료실 주소·화면 코드는 건드리지 않았습니다. 인증서·CA·서명 키·개인키, 별도 접속 프로그램·설치 명령은 추가하지 않았습니다.
+
+**제작 3(검증)**: `npm run decider:test`를 실행한 실제 출력:
+
+```
+통과 · 등록 기기의 정상 요청
+통과 · 미등록 기기의 가상 요청
+이 명령은 가상 요청으로 연습하며 심판 통과 증거가 아닙니다.
+```
+
+- "등록 기기의 정상 요청"(`deviceRegistered: true`인 fixture)은 `allow`로 통과했습니다.
+- "미등록 기기의 가상 요청"(같은 fixture를 복사해 `deviceRegistered: false`로 바꾼 것)은 `deny`+`reasonCode: 'device_not_registered'`로 거부됐습니다 — 값이 없는 경우도 `=== true` 엄격 비교라 같은 이유로 거부됩니다(코드로 확인, `undefined !== true`).
+- 기존 회귀: `npm run test:r5` 재실행 → `2 pass / 0 fail`(그대로 통과).
+- 이 연습은 AGENTS.md·문서 원문이 명시한 대로 **가상 요청 연습이며 실제 심판 판정이 아닙니다.**
+
+**남은 것**: `step_up`(복합 이상 접속 재인증) 규칙은 7단계 범위라 이번에는 추가하지 않았습니다. 실제로 `npm run fixture:7`을 실행해 확인한 결과: `정상 사건: allow / 복합 이상 사건: allow`로 나와 "복합 이상 사건은 step_up이어야 합니다" 오류로 실패합니다 — "자료실 읽기 + 기기 등록"만 보는 지금 규칙은 복합 이상 신호(`recentEvents`)를 전혀 안 보기 때문입니다. `npm run fixture:7`은 6단계 제출 조건에 없고(CHECK.md는 `decider:test`만 요구) 7단계의 연습 스크립트라, 지금 실패하는 건 범위 밖이며 예상된 상태입니다.
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)
 
