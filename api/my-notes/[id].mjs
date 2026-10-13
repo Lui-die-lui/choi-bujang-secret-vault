@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { describeAuthorization } from '../../src/auth-diagnostics.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
 
 const TABLE = 't03_personal_notes';
@@ -58,7 +59,8 @@ export default async function handler(request, response) {
   const auth = await verifyRequestLogin(request, supabaseSecretKey);
   if (!auth.ok) {
     if (request.method === 'GET') {
-      logRead({ outcome: 'unauthorized', status: auth.status, resource: `note:${id}` });
+      logRead({ outcome: 'unauthorized', status: auth.status, resource: `note:${id}`,
+        auth: describeAuthorization(request.headers.authorization) });
     }
     return response.status(auth.status).json(auth.body);
   }

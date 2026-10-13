@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { describeAuthorization } from '../../src/auth-diagnostics.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
 
 const TABLE = 't03_personal_notes';
@@ -21,7 +22,13 @@ export default async function handler(request, response) {
   }
 
   const auth = await verifyRequestLogin(request, supabaseSecretKey);
-  if (!auth.ok) return response.status(auth.status).json(auth.body);
+  if (!auth.ok) {
+    // 8단계 진단: 401 원인(토큰 없음/검증 실패) 구분용. 응답은 그대로입니다.
+    console.info(JSON.stringify({ event: 'my-notes.list', outcome: 'unauthorized',
+      method: request.method, status: auth.status,
+      auth: describeAuthorization(request.headers.authorization) }));
+    return response.status(auth.status).json(auth.body);
+  }
   const { identity } = auth;
 
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {

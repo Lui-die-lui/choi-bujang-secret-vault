@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { describeAuthorization } from '../src/auth-diagnostics.mjs';
 import { verifyRequestLogin } from '../src/notes-auth.mjs';
 
 // 2단계: 가상 메모를 코드 밖(Supabase, t02_vault_notes)으로 옮기고
@@ -21,7 +22,12 @@ export default async function handler(request, response) {
   }
 
   const auth = await verifyRequestLogin(request, supabaseSecretKey);
-  if (!auth.ok) return response.status(auth.status).json(auth.body);
+  if (!auth.ok) {
+    // 8단계 진단: 401 원인(토큰 없음/검증 실패) 구분용. 응답은 그대로입니다.
+    console.info(JSON.stringify({ event: 'notes.list', outcome: 'unauthorized',
+      status: auth.status, auth: describeAuthorization(request.headers.authorization) }));
+    return response.status(auth.status).json(auth.body);
+  }
 
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },

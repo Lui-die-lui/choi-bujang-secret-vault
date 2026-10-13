@@ -183,7 +183,8 @@ git show HEAD:public/data.json
 - 기록 위치: Vercel → 프로젝트 → Logs (검색어 `my-notes.get`). 한 줄이 JSON 하나이며 `console.info`로 남습니다.
 - 기록 항목: `outcome`(`found` 조회 성공 / `not_found` 자료 없음 또는 남의 자료 / `db_error` DB 오류 / `unauthorized` 인증 실패 / `invalid_id` UUID 형식 아님), `kind`(`judge`·`student`), `identity`(심판 토큰이면 `a`·`b`, 아니면 `null`), `uid`(검증된 사용자 ID의 SHA-256 지문 앞 12자리), `resource`(`note:<uuid>`). 인증 전 단계(`invalid_id`)는 ID 길이만, `unauthorized`는 상태 코드와 자료 ID만 남깁니다.
 - 기록하지 않는 것: 토큰, 원본 사용자 ID, 메모 본문, 환경 변수, UUID 형식이 아닌 ID 원문.
-- 확인 방법: 다음 제출 뒤 `my-notes.get`을 검색해 (1) 심판의 A·B 줄이 있는지, (2) A와 B의 `uid`가 서로 다른지, (3) B가 A의 자료 ID를 읽을 때 `outcome`이 무엇인지 봅니다. 시험: `npm run test:zones`(진단 로그 시험 포함, 11건).
+- 확인 방법: 다음 제출 뒤 `my-notes.get`을 검색해 (1) 심판의 A·B 줄이 있는지, (2) A와 B의 `uid`가 서로 다른지, (3) B가 A의 자료 ID를 읽을 때 `outcome`이 무엇인지 봅니다. 시험: `npm run test:zones`(진단 로그 시험 포함, 12건).
+- **401 원인 구분(추가 진단)**: `unauthorized` 줄에 `auth` 항목을 붙였습니다(`src/auth-diagnostics.mjs`, 서명 검증이나 권한 판단은 하지 않고 모양만 분류). `present`(헤더 유무), `bearer`(형식), `issuer`(`none`/`unparseable`/`judge`/`student`/`other`)와, 심판 토큰이면 `algEs256`·`audOk`·`roleJudge`·`identityAB`·`subV4`·`runV4`·`lifetimeOk`·`expired`의 참/거짓만 남깁니다. 목록·공용 경로는 `my-notes.list`·`notes.list` 이벤트로 같은 항목을 남깁니다. 토큰 원문·클레임 값은 기록하지 않습니다. 모두 참인데도 401이면 서명·키 검증 단계의 실패로 볼 수 있습니다.
 - **한계**: 로그가 보이지 않아도 "심판이 API를 호출하지 않았다"나 "판정기를 실행했다"를 의미하지 않습니다(로그 보관 기간·검색 범위·다른 경로 호출 가능). 심판 결과 화면은 판정 코드·설명·점수만 제공하며, 판정기 격리 실행의 출력(로그)은 제공되지 않아 판정기에 로그를 넣어도 관찰할 수 없어 추가하지 않았습니다.
 
 ## 보너스 xdr-01: 무차별 로그인 공격 탐지 (저장점)

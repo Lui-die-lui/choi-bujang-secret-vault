@@ -164,6 +164,62 @@ test('진단 로그: GET 상세 조회의 결과를 구조화해 남기고 민�
   info.mock.restore(); warn.mock.restore(); error.mock.restore();
 });
 
+test('진단 로그: 401의 원인(토큰 없음/검증 실패)을 분류해 남기고 토큰 값은 남기지 않는다', async () => {
+  resetRows();
+  const { describeAuthorization } = await import('../src/auth-diagnostics.mjs');
+  const cfg = JSON.parse((await import('node:fs')).readFileSync(
+    new URL('../aleph.config.json', import.meta.url), 'utf8'));
+  const host = new URL(cfg.publicAppUrl).hostname;
+  const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = (header, payload) => `${b64(header)}.${b64(payload)}.c2ln`;
+  const now = Math.floor(Date.now() / 1000);
+  const judgeOk = { iss: cfg.judgeIssuer, aud: host, sub: randomUUID(), aleph_run: randomUUID(),
+    aleph_role: 'judge', aleph_identity: 'a', iat: now, exp: now + 600 };
+
+  assert.deepEqual(describeAuthorization(undefined), { present: false, bearer: false, issuer: 'none' });
+  assert.equal(describeAuthorization('Basic abc').issuer, 'unparseable');
+  assert.equal(describeAuthorization('Bearer a.b').issuer, 'unparseable');
+
+  const good = describeAuthorization(`Bearer ${jwt({ alg: 'ES256' }, judgeOk)}`);
+  assert.deepEqual(good, { present: true, bearer: true, issuer: 'judge', expired: false,
+    algEs256: true, audOk: true, roleJudge: true, identityAB: true, subV4: true, runV4: true,
+    lifetimeOk: true });
+  const wrongAud = describeAuthorization(`Bearer ${jwt({ alg: 'ES256' }, { ...judgeOk, aud: 'other.example' })}`);
+  assert.equal(wrongAud.audOk, false);
+  assert.equal(describeAuthorization(`Bearer ${jwt({ alg: 'HS256' }, judgeOk)}`).algEs256, false);
+  assert.equal(describeAuthorization(`Bearer ${jwt({ alg: 'ES256' }, { ...judgeOk, aleph_identity: 'c' })}`).identityAB, false);
+  const student = describeAuthorization(`Bearer ${jwt({ alg: 'RS256' }, { iss: cfg.identityProvider.issuer,
+    aud: cfg.identityProvider.audience, role: 'authenticated', exp: now + 60 })}`);
+  assert.deepEqual([student.issuer, student.audOk, student.roleAuthenticated], ['student', true, true]);
+  assert.equal(describeAuthorization(`Bearer ${jwt({ alg: 'ES256' }, { iss: 'https://x.example' })}`).issuer, 'other');
+
+  // 핸들러: 401 응답은 그대로이고, 로그에는 분류만 남고 토큰 원문은 없다.
+  const info = mock.method(console, 'info', () => {});
+  const token = jwt({ alg: 'ES256' }, { ...judgeOk, aud: 'wrong.example' });
+  const detail = await call(byId, { token, query: { id: NOTE_A } });
+  const listing = await call(list, { token });
+  const sharedRes = await call(shared, { token });
+  assert.deepEqual([detail.status, listing.status, sharedRes.status], [401, 401, 401]);
+  assert.deepEqual(detail.body, { error: 'unauthorized' });
+  const events = info.mock.calls.map(c => JSON.parse(String(c.arguments[0])));
+  assert.deepEqual(events.map(e => e.event), ['my-notes.get', 'my-notes.list', 'notes.list']);
+  for (const e of events) {
+    assert.equal(e.outcome, 'unauthorized');
+    assert.equal(e.auth.issuer, 'judge');
+    assert.equal(e.auth.audOk, false);
+    assert.equal(e.auth.roleJudge, true);
+  }
+  const text = info.mock.calls.map(c => String(c.arguments[0])).join(' | ');
+  for (const secret of [token, token.split('.')[1], judgeOk.sub, judgeOk.aleph_run]) {
+    assert.ok(!text.includes(secret));
+  }
+  const anonymous = await call(byId, { query: { id: NOTE_A } });
+  assert.equal(anonymous.status, 401);
+  assert.deepEqual(JSON.parse(String(info.mock.calls.at(-1).arguments[0])).auth,
+    { present: false, bearer: false, issuer: 'none' });
+  info.mock.restore();
+});
+
 test('API: 목록은 요청자 본인 메모만 돌려준다', async () => {
   resetRows();
   const asB = await call(list, { token: 'token-b' });
