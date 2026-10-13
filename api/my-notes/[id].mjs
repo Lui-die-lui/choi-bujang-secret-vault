@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
 
@@ -23,6 +24,14 @@ async function logDenied(supabase, id, method) {
   console.warn(`my-notes denied: resource=note:${id} method=${method} reason=${reason}`);
 }
 
+// 8단계 진단: GET 상세 조회의 처리 결과를 구조화해 기록합니다. 응답·권한 판정은
+// 바꾸지 않습니다. 사용자 ID는 SHA-256 지문 앞 12자리만, 자료 ID는 검증을 통과한
+// UUID만 남기며 토큰·원본 사용자 ID·본문·환경 변수는 기록하지 않습니다.
+const fingerprint = userId => createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
+function logRead(fields) {
+  console.info(JSON.stringify({ event: 'my-notes.get', ...fields }));
+}
+
 // 3단계: 메모 한 건 조회·수정·삭제.
 // 4단계: id 조건과 함께 owner_id = 서버가 검증한 사용자 ID 조건을 쿼리에
 // 같이 넣습니다. 남의 메모는 쿼리 결과가 아예 없으므로 "없는 메모"와 구분
@@ -33,6 +42,9 @@ export default async function handler(request, response) {
 
   const { id } = request.query;
   if (typeof id !== 'string' || !UUID.test(id)) {
+    if (request.method === 'GET') {
+      logRead({ outcome: 'invalid_id', idLength: typeof id === 'string' ? id.length : null });
+    }
     return response.status(400).json({ error: 'invalid_id' });
   }
 
@@ -44,8 +56,17 @@ export default async function handler(request, response) {
   }
 
   const auth = await verifyRequestLogin(request, supabaseSecretKey);
-  if (!auth.ok) return response.status(auth.status).json(auth.body);
+  if (!auth.ok) {
+    if (request.method === 'GET') {
+      logRead({ outcome: 'unauthorized', status: auth.status, resource: `note:${id}` });
+    }
+    return response.status(auth.status).json(auth.body);
+  }
   const { identity } = auth;
+  const readLog = outcome => logRead({
+    outcome, kind: identity.kind, identity: identity.identity ?? null,
+    uid: fingerprint(identity.userId), resource: `note:${id}`,
+  });
 
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
@@ -60,12 +81,15 @@ export default async function handler(request, response) {
       .maybeSingle();
     if (error) {
       console.error('my-notes read failed:', error.message);
+      readLog('db_error');
       return response.status(500).json({ error: 'notes_read_failed' });
     }
     if (!data) {
       await logDenied(supabase, id, 'GET');
+      readLog('not_found');
       return response.status(404).json({ error: 'not_found' });
     }
+    readLog('found');
     return response.status(200).json(serialize(data));
   }
 

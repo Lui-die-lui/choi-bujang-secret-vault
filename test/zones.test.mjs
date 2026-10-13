@@ -13,6 +13,7 @@ const NOTE_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 // ---- 인메모리 저장소와 로그인 대역 ----
 const rows = [];
 const sharedRows = []; // t02_vault_notes 대역
+let forceDbError = false; // 진단 로그 시험용: 다음 조회를 DB 오류로 만든다
 const resetRows = () => {
   sharedRows.length = 0;
   sharedRows.push({ id: 1, owner_id: null, title: '공용 제목', content: '공용 본문' });
@@ -32,6 +33,7 @@ function query(table) {
     ? row => ({ title: row.title, content: row.content })
     : row => ({ id: row.id, title: row.title, content: row.content });
   const run = () => {
+    if (forceDbError) return { data: null, error: { message: 'simulated db failure' } };
     const hit = source.filter(r => filters.every(([k, v]) => r[k] === v));
     if (op === 'update') hit.forEach(r => Object.assign(r, patch));
     if (op === 'delete') hit.forEach(r => source.splice(source.indexOf(r), 1));
@@ -63,10 +65,15 @@ mock.module(new URL('../src/notes-auth.mjs', import.meta.url).href, {
   namedExports: {
     verifyRequestLogin: async request => {
       const auth = request.headers.authorization;
-      const userId = { 'Bearer token-a': A, 'Bearer token-b': B }[auth];
-      return userId
-        ? { ok: true, identity: { kind: 'student', userId } }
-        : { ok: false, status: 401, body: { error: 'unauthorized' } };
+      const userId = { 'Bearer token-a': A, 'Bearer token-b': B,
+        'Bearer token-judge-a': A, 'Bearer token-judge-b': B }[auth];
+      if (!userId) return { ok: false, status: 401, body: { error: 'unauthorized' } };
+      // 심판 A/B 토큰 대역: verify-login.mjs는 { kind:'judge', userId, runId, identity:'a'|'b' }를 돌려준다.
+      if (auth.startsWith('Bearer token-judge-')) {
+        return { ok: true, identity: { kind: 'judge', userId, runId: 'run-fixture',
+          identity: auth.endsWith('-a') ? 'a' : 'b' } };
+      }
+      return { ok: true, identity: { kind: 'student', userId } };
     },
   },
 });
@@ -112,6 +119,49 @@ test('API: A는 자기 메모를 조회·수정하고, B는 A 메모를 조회·
   assert.match(logs, /reason=owner_mismatch/u);
   assert.doesNotMatch(logs, /token|탈취|A 본문/u);
   warn.mock.restore();
+});
+
+test('진단 로그: GET 상세 조회의 결과를 구조화해 남기고 민감 값은 남기지 않으며 응답은 그대로다', async () => {
+  resetRows();
+  const info = mock.method(console, 'info', () => {});
+  const warn = mock.method(console, 'warn', () => {});
+  const error = mock.method(console, 'error', () => {});
+  const events = () => info.mock.calls.map(c => JSON.parse(String(c.arguments[0])))
+    .filter(e => e.event === 'my-notes.get');
+  const fp = id => createHash('sha256').update(id).digest('hex').slice(0, 12);
+
+  const found = await call(byId, { token: 'token-judge-a', query: { id: NOTE_A } });
+  const denied = await call(byId, { token: 'token-judge-b', query: { id: NOTE_A } });
+  forceDbError = true;
+  const broken = await call(byId, { token: 'token-a', query: { id: NOTE_A } });
+  forceDbError = false;
+  const anonymous = await call(byId, { query: { id: NOTE_A } });
+  const badId = await call(byId, { token: 'token-a', query: { id: 'SECRET-TEXT-NOT-UUID' } });
+
+  // 응답은 진단 로그 추가 전과 같다.
+  assert.deepEqual([found.status, denied.status, broken.status, anonymous.status, badId.status],
+    [200, 404, 500, 401, 400]);
+  assert.deepEqual(denied.body, { error: 'not_found' });
+
+  const [e1, e2, e3, e4, e5] = events();
+  assert.deepEqual(e1, { event: 'my-notes.get', outcome: 'found', kind: 'judge', identity: 'a',
+    uid: fp(A), resource: `note:${NOTE_A}` });
+  assert.deepEqual(e2, { event: 'my-notes.get', outcome: 'not_found', kind: 'judge', identity: 'b',
+    uid: fp(B), resource: `note:${NOTE_A}` });
+  assert.equal(e3.outcome, 'db_error');
+  assert.equal(e3.kind, 'student');
+  assert.equal(e3.identity, null);
+  assert.deepEqual([e4.outcome, e4.status], ['unauthorized', 401]);
+  assert.deepEqual(e5, { event: 'my-notes.get', outcome: 'invalid_id', idLength: 'SECRET-TEXT-NOT-UUID'.length });
+  assert.notEqual(e1.uid, e2.uid); // A와 B의 지문이 다르다
+
+  // 토큰·원본 사용자 ID·본문·환경 변수·잘못된 ID 원문은 기록에 없다.
+  const all = [info, warn, error].flatMap(m => m.mock.calls.map(c => c.arguments.join(' '))).join(' | ');
+  for (const secret of ['token-', A, B, 'A 본문', 'B 본문', 'test-only-not-a-real-key',
+    'SECRET-TEXT-NOT-UUID', 'example.invalid']) {
+    assert.ok(!all.includes(secret), `로그에 남으면 안 되는 값: ${secret}`);
+  }
+  info.mock.restore(); warn.mock.restore(); error.mock.restore();
 });
 
 test('API: 목록은 요청자 본인 메모만 돌려준다', async () => {
