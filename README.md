@@ -14,7 +14,7 @@
 - **7단계**: 같은 판정기가 "평소와 다른 시각 + 처음 보는 네트워크 + 갑작스러운 대량 자료 읽기"가 겹친 가상 접속 사건을 `step_up`(추가 확인)으로 보냅니다. 아래 "7단계" 절 참고. 실제 자료 차단·재로그인 후 허용은 **미실행**입니다.
 - **8단계**: 판정기가 자료를 구역(자원 ID)으로 나눕니다 — 메모는 `note:<id>`, 강사 공지는 `announcement:<id>`. 알 수 없는 경로·메서드는 거부하고, 강사 공지 수정은 항상 거부합니다(강사 권한을 검증해 주는 계약이 없음). **판정기의 소유자(A/B) 구분은 미구현**이며 남의 메모 차단은 최종 API의 `owner_id` 조건만 맡습니다. 아래 "8단계" 절 참고.
 - **9단계**: `src/detect.mjs`의 `detect(events)`가 같은 가명 사용자의 `GET` 사건이 10분 안에 120건을 넘을 때만 `propose_revocation`(이유 코드 `burst_read`)을 **제안**합니다. 그 밖에는 `observe`입니다. 실제 회수·권한 변경은 하지 않습니다. 아래 "9단계" 절 참고.
-- **10단계**: `GET /api/note-restore/:id`가 복원할 사본 버전과 바뀔 항목을 먼저 보여 주고(아무것도 쓰지 않음), `POST /api/note-restore/:id`가 비공개 사본(`t10_note_backups`)에서 로그인한 본인의 메모 한 건만 되살립니다(사본을 읽어 ID·소유자·내용 해시를 대조하고 쓰기 직전에 한 번 더 읽어 검증, 하나라도 다르면 중단). `npm run policy:diff` / `npm run policy:restore -- --confirm`은 시험 정책(`src/decider.mjs`)을 검증된 안전 사본과 비교·복원합니다. **`supabase/t10_note_backups.local.sql`을 실행해야 배포본에서 작동합니다.** 아래 "10단계" 절 참고.
+- **10단계**: `GET /api/note-restore/:id`가 복원할 사본 버전과 바뀔 항목을 먼저 보여 주고(아무것도 쓰지 않음), `POST /api/note-restore/:id`가 비공개 사본(`t10_note_backups`)에서 로그인한 본인의 메모 한 건만 되살립니다(사본을 읽어 ID·소유자·내용 해시를 대조하고 쓰기 직전에 한 번 더 읽어 검증, 하나라도 다르면 중단). 복원 시도는 덧붙이기 전용 감사 기록 표(`t10_restore_audit`)에 한 줄씩 남고, 다른 메모와 전부터 있던 감사 기록은 바꾸지 않습니다. `npm run policy:diff` / `npm run policy:restore -- --confirm`은 시험 정책(`src/decider.mjs`)을 검증된 안전 사본과 비교·복원합니다. **`supabase/t10_note_backups.local.sql`을 실행해야 배포본에서 작동합니다.** 아래 "10단계" 절 참고.
 - **다시 실행하는 방법**: 저장소를 받은 뒤 Vercel Environment Variables에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 입력하고, Supabase SQL Editor에서 `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/owner_fixtures.local.sql`(선택, 시험 데이터), `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`을 순서대로 실행한 뒤 배포합니다. 로컬에서 정적 화면 생성만 확인할 때는 `npm run build -- --local`, 코드 기본 동작 점검은 `npm run test:r5`를 사용합니다(둘 다 실제 Supabase 접속 없이 실행 가능).
 - **남은 약점**: `/api/notes`(공용 자료)는 로그인만 확인하고 소유자 개념이 없습니다(의도된 설계, 아래 4단계 절 참고). 과거 공개 커밋·배포 이력의 메모 노출도 해소되지 않았습니다(아래 2단계 절 참고).
 
@@ -216,7 +216,7 @@ git show HEAD:public/data.json
 
 ## 10단계: 백업에서 자료실을 되살립니다
 
-**시작 상태**: 저장소(모든 원격 브랜치 포함)에 정책 사본·메모 사본·감사 기록 표·백업 검증 방식이 없었습니다(`aleph.config.json`의 `restoreRoute: null`뿐). CHECK.md에도 사건 자료는 없습니다. 그래서 이미 있는 구조(자료 API의 로그인·소유자 조건, Git 커밋, `*.local.sql` 관례)만 써서 아래를 새로 만들었습니다. `src/decider.mjs`와 기존 API의 응답은 바꾸지 않았습니다.
+**시작 상태**: 10단계 작업을 시작할 때는 저장소(모든 원격 브랜치 포함)에 정책 사본·메모 사본·감사 기록·백업 검증 방식이 주어져 있지 않았습니다(`aleph.config.json`의 `restoreRoute: null`뿐). 지금은 아래처럼 사본 표·감사 기록 표·정책 사본을 이 단계에서 만들어 쓰고 있습니다. CHECK.md에도 사건 자료는 없습니다. 그래서 이미 있는 구조(자료 API의 로그인·소유자 조건, Git 커밋, `*.local.sql` 관례)만 써서 아래를 새로 만들었습니다. `src/decider.mjs`와 기존 API의 응답은 바꾸지 않았습니다.
 
 ### 메모 한 건 복원 — 서비스와 경로
 
@@ -239,6 +239,7 @@ git show HEAD:public/data.json
 - **내용 해시**: `sha256(<제목 바이트 길이> + ':' + 제목 + 본문)` (`src/note-backup.mjs`의 `contentHash`). SQL의 기존 메모 사본 만들기 식과 같은 모양입니다.
 - **감사 기록(덧붙이기 전용)**: Supabase 표 `public.t10_restore_audit`에 복원(`POST`) 시도를 결과와 상관없이 한 줄씩 덧붙입니다(`note_id`·`owner_id`·`outcome`·`reason`·사본 해시·복원 전 해시·복원 후 해시·시각). 성공한 복원은 **쓰기 전에** `restore_started` 한 줄을 먼저 남기고(남기지 못하면 500 `restore_audit_failed`로 멈추고 메모를 바꾸지 않음), 끝난 뒤 `restored` 한 줄을 남깁니다. 사본 없음·검증 실패·남의 메모로 멈춘 시도도 한 줄씩 남습니다. 미리보기(`GET`)는 감사 기록을 포함해 아무것도 쓰지 않습니다. 코드에는 이 표를 고치거나 지우는 요청이 없고, 표 권한도 `service_role`에 SELECT·INSERT만 줍니다(UPDATE·DELETE 없음, `anon`·`authenticated`는 접근 불가). 제목·본문·토큰은 담지 않습니다. 서버 로그에는 기존처럼 `note-restore.preview`·`note-restore.restore` 한 줄(JSON)을 남기며 기존 로그 줄은 바꾸지 않았습니다.
 - **복원이 바꾸는 범위**: 메모 표에서는 지정한 한 행, 감사 표에서는 새 줄 추가뿐입니다. 다른 메모·다른 계정 자료·사본 표·전부터 있던 감사 기록·판정기 규칙(`src/decider.mjs`)은 읽기만 하거나 건드리지 않습니다(`npm run test:restore`의 "감사 기록" 시험이 전부터 있던 기록과 다른 메모가 그대로인지 확인).
+- **표 정의는 저장소에 있습니다**: `docs/sql/t10_note_backups.sql`(사본 표·권한·기존 메모 사본 만들기), `docs/sql/t10_restore_audit.sql`(감사 표·덧붙이기 전용 권한), `docs/sql/t10_restore_check.sql`(복원 뒤 읽기 전용 확인: 복원한 한 건의 ID·소유자·내용 해시가 사본과 같은지, 사본 해시 불일치 수, 그 메모의 감사 기록, 감사·메모 전체 건수). 세 파일 모두 메모 내용이나 비밀값이 없습니다. `supabase/*.local.sql`은 같은 내용의 로컬 사본입니다.
 - **감사 표 준비(2026-10-13 실행함)**: 학생이 Supabase SQL Editor에서 `supabase/t10_restore_audit.local.sql`을 실행했습니다(로컬 전용 파일, Git 미포함). 공개 키로 이 표를 직접 조회하거나 줄을 추가하면 둘 다 `42501 permission denied`(HTTP 401)로 거부되는 것을 확인했습니다. 새 프로젝트에서는 이 SQL을 실행하기 전까지 복원 요청이 500 `restore_audit_failed`로 중단됩니다(메모는 바뀌지 않음).
 - **사본 표 준비(2026-10-13 실행함)**: 학생이 Supabase SQL Editor에서 `supabase/t10_note_backups.local.sql`을 실행했습니다(로컬 전용 파일, Git 미포함). 표를 만들고 권한을 닫은 뒤, 그때 있던 메모의 사본을 한 번 만듭니다. 공개 키로 이 표를 직접 조회하면 `42501 permission denied`(HTTP 401)로 거부되는 것을 확인했습니다(없는 표 이름은 404). 새 프로젝트에서는 이 SQL을 실행하기 전까지 복원 요청이 500 `backup_unavailable`로 중단됩니다.
 - **알려진 한계**: 사본은 처음 만든 내용이라, 복원하면 그 뒤의 정상 수정도 함께 되돌아갑니다. `restoreRoute`의 표기(`POST /api/note-restore/:id`)는 `allowedRoutes`와 같은 모양으로 적은 제 판단이며, 심판이 기대하는 형식·응답 모양에 대한 공식 자료는 찾지 못했습니다.
@@ -270,7 +271,7 @@ git show HEAD:public/data.json
 - 세 번째 제출(`5022a3e`)도 같은 판정(12/100)이었고, 로그에 심판 요청은 여전히 없었습니다. ①②③만으로는 풀리지 않았습니다.
 - 대응(네 번째 제출용): 같은 판정을 받았다가 통과한 다른 학생의 공개 기록을 보니, 통과 직전에 넣은 것이 "실행 전에 사본 버전과 바뀔 항목을 보여 주는 미리보기"와 "실행 직전 재검증"이었습니다(심판 안내문의 "실행 전에 버전과 바뀔 항목을 보여 줍니다"와 같은 내용). 그래서 ④ 메모 복원에 미리보기(`GET /api/note-restore/:id`)를 넣고 복원 응답에도 사본 버전·바뀔 항목을 싣고, ⑤ 복원 경로를 `:id`가 끝에 오는 `POST /api/note-restore/:id`로 옮겼습니다(통과한 저장소들의 복원 경로가 모두 고정 경로이거나 `:id`가 끝에 오는 모양). 코드는 직접 썼고 다른 저장소의 코드를 옮기지 않았습니다.
 - 네 번째 제출(`30c6c59`): 24/100. "조건 5개 가운데 2개" — 「백업 검증」(`S10_BACKUP_UNVERIFIED`)과 「감사 기록 보존」(`S10_AUDIT_DROPPED`: "감사 기록이 없거나, 지정한 한 건 밖의 메모·규칙을 바꿨습니다"). 점수는 올랐고 판정 내용이 처음으로 바뀌었습니다. 학생이 본 Vercel 로그에는 이번에도 심판 요청이 보이지 않았습니다(필터가 걸린 화면이라 확정은 아님).
-- 대응(다섯 번째 제출용): ⑥ 감사 기록 표 `t10_restore_audit`를 넣어 복원 시도를 덧붙이기만 하도록 함(위 "감사 기록" 참고). 그전에는 감사 기록 표가 없고 서버 로그 한 줄뿐이었습니다.
+- 대응(다섯 번째 제출용): ⑥ 감사 기록 표 `t10_restore_audit`를 넣어 복원 시도를 덧붙이기만 하도록 함(위 "감사 기록" 참고).
 - 원인: **확정하지 못했습니다.** 심판이 무엇을 읽고 「백업 검증」을 판정하는지 공식 자료가 없습니다. 위 대응은 판정 문구("사본을 다시 읽어 검증")에 맞춘 것이며, 다시 제출해야 결과를 알 수 있습니다.
 - 넣은 진단: 복원 로그 줄에 `kind`·`identity`(심판 A·B)와 `request`(본문·쿼리 항목의 이름과 값의 종류·길이, 값 자체는 없음)를 붙였습니다. 복원 동작과 응답은 바꾸지 않았습니다. 다음 제출 뒤 Vercel Logs에서 `my-notes.restore`를 검색합니다(로그 수준 필터를 "전체"로, 시간 범위를 제출 시각 포함으로).
 
