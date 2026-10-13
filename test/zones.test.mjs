@@ -290,10 +290,23 @@ test('판정기: 소유자 구분은 미구현 — 같은 모양의 다른 자�
   assert.equal(others.decision, 'allow');
 });
 
-test('판정기: 자기 메모 읽기·수정은 허용, 목록은 허용', async () => {
+test('판정기: 자기 메모 읽기·수정은 허용, 메모 전체 목록 경로는 거부', async () => {
   assert.equal(await verdict({}), 'allow');
   assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id' }), 'allow');
-  assert.equal(await verdict({ path: '/notes', route: 'GET /notes' }), 'allow');
+  assert.equal(await verdict({ path: '/notes', route: 'GET /notes' }), 'deny');
+  assert.equal(await verdict({ path: '/notes/', route: 'GET /notes' }), 'deny');
+  assert.equal(await verdict({ path: '/notes/list', route: 'GET /notes/:id' }), 'deny');
+  assert.equal(await verdict({ path: '/notes', route: 'GET /notes',
+    stepUp: { verified: true, authAgeSeconds: 5 } }), 'deny');
+});
+
+test('판정기: 공지 쓰기는 POST·PUT·PATCH·DELETE 모두 거부', async () => {
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    assert.equal(await verdict({ service: 'announcements', method, path: '/announcements/n1',
+      route: `${method} /announcements/:id` }), 'deny', method);
+    assert.equal(await verdict({ service: 'announcements', method, path: '/announcements',
+      route: `${method} /announcements` }), 'deny', method);
+  }
 });
 
 test('판정기: 강사 공지 수정은 학생·재인증과 관계없이 거부', async () => {

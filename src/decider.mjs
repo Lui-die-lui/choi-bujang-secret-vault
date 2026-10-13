@@ -43,9 +43,10 @@ const MAX_STEP_UP_AGE_SECONDS = 900;
 // 구역 경로 표: 계약의 route 모양과 path를 둘 다 정확히 맞춥니다(부분 문자열·startsWith 금지).
 // :id는 자료 ID 한 칸만이며, 기능은 쿼리가 아니라 route로만 고릅니다(쿼리는 길이 0만 허용).
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
-const RESERVED_IDS = new Set(['export', 'import', 'search', 'all', 'admin']);
+const RESERVED_IDS = new Set(['export', 'import', 'search', 'all', 'list', 'admin']);
+// 메모 전체 목록(GET /notes)은 여러 사람의 자료를 한꺼번에 여는 경로라 표에 두지 않습니다
+// (심판 S08_OTHER_ZONE_ALLOWED 안내). 표에 없는 경로는 알 수 없는 경로로 거부됩니다.
 const ZONE_ROUTES = Object.freeze([
-  { service: 'notes', route: 'GET /notes', collection: '/notes', kind: 'note_list' },
   { service: 'notes', route: 'GET /notes/:id', prefix: '/notes/', kind: 'note' },
   { service: 'notes', route: 'PUT /notes/:id', prefix: '/notes/', kind: 'note' },
   { service: 'announcements', route: 'PUT /announcements/:id', prefix: '/announcements/', kind: 'announcement' },
@@ -58,10 +59,6 @@ export function classifyResource(request) {
   for (const zone of ZONE_ROUTES) {
     if (request.service !== zone.service || request.route !== zone.route
         || !zone.route.startsWith(`${request.method} `)) continue;
-    if (zone.collection) {
-      if (request.path === zone.collection) return { kind: zone.kind, resourceId: 'note_list' };
-      continue;
-    }
     if (!request.path.startsWith(zone.prefix)) continue;
     const id = request.path.slice(zone.prefix.length);
     if (!ID_PATTERN.test(id) || RESERVED_IDS.has(id.toLowerCase())) continue;

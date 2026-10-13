@@ -134,7 +134,7 @@ git show HEAD:public/data.json
 
 | 자원 | 서비스 | route(계약 모양) | 자원 ID | 판정기 | 최종 API |
 |---|---|---|---|---|---|
-| 내 메모 목록 | notes | `GET /notes` | `note_list` | 허용 | `GET /api/my-notes`: `owner_id = 검증된 사용자` 조건 |
+| 메모 전체 목록 | notes | `GET /notes` | — | **거부**(`starter_not_ready`, 규칙 `starter.deny`) — 여러 사람의 자료를 한꺼번에 여는 경로라 판정기에서 닫음(심판 안내 반영, 커밋 `2b3d8e9` 판정 48/100 이후) | `GET /api/my-notes`: `owner_id = 검증된 사용자` 조건(API는 그대로) |
 | 내 메모 한 건 읽기 | notes | `GET /notes/:id` | `note:<id>` | 허용 | `GET /api/my-notes/:id`: `id`+`owner_id` 조건, 불일치 404 |
 | 내 메모 수정 | notes | `PUT /notes/:id` | `note:<id>` | 허용 | `PUT /api/my-notes/:id`: 같은 조건, 본문은 `title`·`body`만 읽음 |
 | 강사 공지 수정 | announcements(가정) | `PUT /announcements/:id`(가정) | `announcement:<id>` | **항상 거부**(`starter_not_ready`, 규칙 `instructor_notice_only`) | 이 저장소에 공지 라우트·저장소 없음 |
@@ -148,7 +148,7 @@ git show HEAD:public/data.json
 - **알려진 한계**: 화면 메뉴와 기존 주소·자료·ID는 바꾸지 않았습니다.
 
 **시험(실제 실행)**
-- `npm run test:zones`(신규, `test/zones.test.mjs`): 10건 통과(공용 `/api/notes` 대역 시험 1건, 판정기 소유자 미구분 고정 시험 1건 포함). 판정기 **가상 요청** 4건(자기 메모 읽기·수정·목록 허용 / 공지 수정은 재인증·미등록 기기와 무관하게 거부 / 알 수 없는 경로·`DELETE`·`POST`·쿼리·`export` 거부 / 미등록 기기 거부·복합 이상 `step_up` 유지) + `api/my-notes` 핸들러를 **인메모리 대역**(Supabase·로그인 검증을 흉내 냄)으로 돌린 4건(A 조회·수정 성공, B의 A 메모 조회·수정·삭제 404, 거부 뒤 저장 데이터 불변, B 목록에 A 자료 없음, `owner_id`·`role` 위조해도 소유자 불변, 405/400/401).
+- `npm run test:zones`(신규, `test/zones.test.mjs`): 10건 통과(공용 `/api/notes` 대역 시험 1건, 판정기 소유자 미구분 고정 시험 1건 포함). (이후 진단 로그 시험과 목록·공지 쓰기 거부 시험이 더해져 현재 13건 통과.) 판정기 **가상 요청** 4건(자기 메모 읽기·수정 허용, 메모 전체 목록 `GET /notes`는 거부 / 공지 수정은 재인증·미등록 기기와 무관하게 거부 / 알 수 없는 경로·`DELETE`·`POST`·쿼리·`export` 거부 / 미등록 기기 거부·복합 이상 `step_up` 유지) + `api/my-notes` 핸들러를 **인메모리 대역**(Supabase·로그인 검증을 흉내 냄)으로 돌린 4건(A 조회·수정 성공, B의 A 메모 조회·수정·삭제 404, 거부 뒤 저장 데이터 불변, B 목록에 A 자료 없음, `owner_id`·`role` 위조해도 소유자 불변, 405/400/401).
 - `npm run decider:test` 4건 통과, `npm run fixture:7` 정상 `allow`·복합 이상 `step_up`, `npm run test:r5` 2 pass.
 - **완료/미구현/미실행 한눈에**: ✔ API `owner_id` 조건(대역 시험으로 확인) · ✔ 판정기 경로·메서드·쿼리 구역 규칙(가상 시험) · ✔ 공지 수정 항상 거부 · ✘ **판정기 소유자 구분(미구현)** · ✘ 강사 공지 수정 허용(근거 없음, 미구현) · ⏸ 아래 미실행 항목.
 
@@ -175,6 +175,15 @@ git show HEAD:public/data.json
 1. 판정기에서 `subjectId`와 자원 경로를 연결하는 공식 구역 규약(어떤 필드·경로 모양으로 "내 메모"와 "남의 메모"를 구분하는가)
 2. 8단계의 실제 판정기 요청 예시 또는 fixture(`fixture:7`처럼 `fixture:8`이 있는지)
 3. 강사 공지의 서비스·경로 이름과 강사 권한을 판정기에 전달하는 필드(별도 계약)
+
+### 8단계 재판정 대응 (커밋 `2b3d8e9`, 48/100, 갓김치사량만 미격파)
+
+심판 안내: "판정기가 반 공지·강사 자료에 대한 쓰기(POST·PUT·PATCH·DELETE)를 허용하거나 메모 전체 목록 경로를 열어 둡니다. … 메모 한 건의 주인 비교는 API 가 하므로 판정기에 넣지 않아도 됩니다."
+
+- **고친 것**: `src/decider.mjs`의 구역 표에서 `GET /notes`(메모 전체 목록)를 뺐습니다. 이제 알 수 없는 경로로 거부됩니다(`starter_not_ready`, 규칙 `starter.deny`). `:id` 자리에 오는 기능 이름 예약어에 `list`를 더했습니다(이 낱말은 제 가정).
+- **그대로 둔 것**: 공지 쓰기는 이미 모든 메서드가 거부였습니다(`PUT /announcements/:id`는 `instructor_notice_only`, 나머지는 알 수 없는 경로). 메모 한 건 읽기·수정 허용, 6·7단계 규칙, `api/my-notes`의 목록·소유자 조건은 바꾸지 않았습니다. 위 "판정기의 소유자 구분: 미구현"은 심판 안내대로 API가 맡는 것으로 정리됩니다.
+- **버튼으로 연습**: `npm run check:page` → 브라우저에서 `http://127.0.0.1:4178/` → **전체 검사**. 내 컴퓨터에서만 열리는 로컬 화면이며(배포 안 됨) 판정기에 가상 요청 11건을 넣습니다. 심판 통과 증거가 아닙니다.
+- **확인하지 못한 것**: 심판이 실제로 보낸 요청 모양. 목록 경로가 원인이라는 것은 안내 문구에 따른 판단이며, 다시 제출해야 결과를 알 수 있습니다.
 
 ### 8단계 진단 로그 (`GET /api/my-notes/:id`)
 
