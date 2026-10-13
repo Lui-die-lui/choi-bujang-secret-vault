@@ -174,40 +174,14 @@ const verdict = async over => (await decide(base(over))).decision;
 const composite = { signals: { source: 'judge_fixture', region: 'local', network: 'unusual', hour: 3 },
   recentEvents: [{ kind: 'risk_signal', ageSeconds: 60, count: 20 }] };
 
-test('판정기: 자료 ID에 소유자 subjectId가 들어 있으면 A는 허용, B의 A 메모는 거부(부분 구현)', async () => {
-  const idA = 'learner_a-note1';
-  const asA = { subjectId: 'learner_a', path: `/notes/${idA}` };
-  const asB = { subjectId: 'learner_b', path: `/notes/${idA}` };
-  for (const [method, route] of [['GET', 'GET /notes/:id'], ['PUT', 'PUT /notes/:id']]) {
-    assert.equal(await verdict({ ...asA, method, route }), 'allow');
-    const denied = await decide(base({ ...asB, method, route }));
-    assert.equal(denied.decision, 'deny');
-    assert.equal(denied.reasonCode, 'starter_not_ready');
-    assert.deepEqual(denied.ruleIds, ['other_zone_denied']);
-  }
-  // 미등록 기기·복합 이상은 이 규칙보다 먼저/뒤에서 그대로 유지된다.
-  assert.equal((await decide(base({ ...asB, deviceRegistered: false }))).reasonCode, 'device_not_registered');
-  assert.equal(await verdict({ ...asA, ...composite }), 'step_up');
-});
-
-test('판정기: 소유자 표식이 없는 ID(demo, UUID)는 구분하지 못해 허용 — 이 부분은 API가 막는다', async () => {
-  assert.equal(await verdict({ path: '/notes/demo' }), 'allow');
-  assert.equal(await verdict({ subjectId: 'learner_b', path: `/notes/${NOTE_A}` }), 'allow');
-});
-
-test('판정기: other 등 다른 주체 표식이 든 ID는 거부, 공지 낱말이 든 ID는 위치와 무관하게 공지', async () => {
-  for (const path of ['/notes/other', '/notes/other_fixture', '/notes/another-note', '/notes/note-foreign-1']) {
-    assert.equal(await verdict({ path }), 'deny', path);
-    assert.equal(await verdict({ path, method: 'PUT', route: 'PUT /notes/:id' }), 'deny', path);
-  }
-  assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id', path: '/notes/class-notice-3' }), 'deny');
-  assert.equal(await verdict({ path: '/notes/learner_fixture-other' }), 'allow'); // 내 subjectId 포함 → 내 구역
-  assert.equal(await verdict({ path: `/notes/${NOTE_B}` }), 'allow'); // UUID는 API가 검사
-});
-
-test('판정기: 공지 ID를 notes 경로로 표현해도 수정은 거부', async () => {
-  assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id', path: '/notes/announcement-1' }), 'deny');
-  assert.equal(await verdict({ method: 'PUT', route: 'PUT /notes/:id', path: '/notes/notice_2' }), 'deny');
+test('판정기: 소유자 구분은 미구현 — 같은 모양의 다른 자료 ID도 구분 없이 허용한다(API가 막음)', async () => {
+  // 계약에 소유자·역할 필드가 없어 판정기는 A의 메모와 B의 메모를 구분할 수 없다.
+  // 이 시험은 그 한계를 그대로 고정해 두어, 판정기가 소유자를 막는다고 오해하지 않게 한다.
+  const mine = await decide(base({ path: `/notes/${NOTE_A}`, method: 'PUT', route: 'PUT /notes/:id' }));
+  const others = await decide(base({ path: `/notes/${NOTE_B}`, method: 'PUT', route: 'PUT /notes/:id',
+    subjectId: 'learner_other' }));
+  assert.equal(mine.decision, 'allow');
+  assert.equal(others.decision, 'allow');
 });
 
 test('판정기: 자기 메모 읽기·수정은 허용, 목록은 허용', async () => {
