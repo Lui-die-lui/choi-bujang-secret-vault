@@ -24,7 +24,7 @@
 // 없는 이 코드의 가정입니다.
 export const RULE_IDS = Object.freeze([
   'starter.deny', 'device_registered', 'step_up_required', 'region_changed',
-  'note_zone', 'instructor_notice_only',
+  'note_zone', 'instructor_notice_only', 'other_zone_denied',
 ]);
 
 // 임계치 출처: 공식 계약에 있는 값은 stepUp.authAgeSeconds의 0~900초 범위와 recentEvents
@@ -65,11 +65,32 @@ export function classifyResource(request) {
     if (!request.path.startsWith(zone.prefix)) continue;
     const id = request.path.slice(zone.prefix.length);
     if (!ID_PATTERN.test(id) || RESERVED_IDS.has(id.toLowerCase())) continue;
+    if (zone.kind === 'note' && NOTICE_ID_PREFIX.test(id.toLowerCase())) {
+      return { kind: 'announcement', resourceId: `announcement:${id}`, id };
+    }
     const label = zone.kind === 'announcement' ? 'announcement' : 'note';
-    return { kind: zone.kind, resourceId: `${label}:${id}` };
+    return { kind: zone.kind, resourceId: `${label}:${id}`, id };
   }
   return null;
 }
+
+// 자료 ID와 요청 사용자(subjectId)의 관계 — 계약에 소유자 필드가 없어, 요청 안에서 비교할
+// 수 있는 두 값(request.subjectId, 경로의 자료 ID)만 씁니다. 공식 계약이 아니라 "자료 ID에
+// 소유자의 subjectId가 들어 있다"는 가정에 기댄 부분 구현입니다.
+//  - own: ID에 내 subjectId 전체가 들어 있음 → 내 구역
+//  - foreign: 내 subjectId는 없는데 ID가 내 subjectId와 같은 계열의 토큰(3자 이상)을 가짐
+//    → 다른 주체의 구역으로 봅니다(예: learner_a 요청에 learner_b-note1)
+//  - unscoped: 소유자 표식이 없는 ID(예: demo, UUID) → 판정기가 구분하지 못하며 API가 검사
+const tokensOf = text => String(text).toLowerCase().split(/[^a-z0-9가-힣]+/u).filter(t => t.length >= 3);
+function idOwnerRelation(resourceId, subjectId) {
+  const id = String(resourceId).toLowerCase();
+  const subject = String(subjectId).trim().toLowerCase();
+  if (subject && id.includes(subject)) return 'own';
+  const idTokens = new Set(tokensOf(id));
+  return tokensOf(subject).some(token => idTokens.has(token)) ? 'foreign' : 'unscoped';
+}
+// 공지 자원을 notes 경로로 표현하는 경우를 대비해, 공지를 뜻하는 ID 접두어도 공지로 봅니다.
+const NOTICE_ID_PREFIX = /^(announcement|notice|instructor|teacher|공지)/u;
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isCount = value => Number.isInteger(value) && value >= 0;
@@ -138,7 +159,11 @@ export async function decide(request) {
     // 쓰는 starter_not_ready로 거부합니다(새 이유 코드를 만들지 않음).
     return response(request, 'deny', 'starter_not_ready', ['instructor_notice_only']);
   }
-  // 3) 복합 이상 접속은 추가 확인 전까지 자료를 주지 않습니다(영구 차단 아님).
+  // 3) 다른 주체의 구역으로 보이는 자료는 거부합니다(소유자 구분은 부분 구현, 위 주석 참고).
+  if (zone.kind === 'note' && idOwnerRelation(zone.id, request.subjectId) === 'foreign') {
+    return response(request, 'deny', 'starter_not_ready', ['other_zone_denied']);
+  }
+  // 4) 복합 이상 접속은 추가 확인 전까지 자료를 주지 않습니다(영구 차단 아님).
   const anomalyRule = assessCompositeAnomaly(request);
   if (anomalyRule) {
     if (stepUpVerified(request.stepUp)) {
