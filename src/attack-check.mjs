@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 
@@ -9,6 +11,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_T6veZAYIlx2HYpfPOTJ50g_yXVERRoW';
 const SECRET_KEY_PATTERN = /sb_secret_[A-Za-z0-9_-]{12,}/u;
 
 export async function runAttackChecks(config) {
+  // 12단계 격리 환경 규칙(다른 학생 저장소들이 공통으로 적어 둔 심판 메모를 근거로 함. 공식 원문은
+  // 이 저장소에 없음): 요청은 공개 HTTPS GET·HEAD만, 점검 하나에 요청 하나, 요청마다 fetch 옵션
+  // alephEvidence { caseId: attackId, requestKey }로 심판 기록과 연결(헤더·주소에는 넣지 않음),
+  // observed는 심판이 대조할 수 있는 "HTTP <상태>" 형식, 보내지 않은 점검은 observed를 not_run으로.
   // 6단계: src/decider.mjs의 기기 등록 규칙은 반 엔진만 호출하고 이 앱의
   // api/*.mjs 어디서도 decide()를 부르지 않아(이전 단계부터 동일), 실제 HTTP
   // 요청으로 새로 점검할 길이 없습니다. 5단계부터의 보호(로그인·소유자·직접
@@ -45,10 +51,15 @@ export async function runAttackChecks(config) {
   // 같은 순서의 attackId 결과를 만듭니다. 요청을 보내지 않은 점검(not_run)은 마지막에 둡니다.
   // 요청은 모두 GET이며, 응답 본문은 메모가 있는지 여부만 보고 기록하지 않습니다.
   const attempts = [];
-  const get = (url, init = {}) => fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000), ...init });
+  // alephEvidence는 요청·헤더·권한에 쓰이지 않는 실행기 연결용 메타데이터입니다. 요청 식별값은
+  // 이 점검 하나만을 위한 일회용 UUID입니다(서버가 만든 요청 ID가 아님).
+  const get = (url, attackId, init = {}) => fetch(url, {
+    method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000), ...init,
+    alephEvidence: { caseId: attackId, requestKey: randomUUID() },
+  });
 
   // 1) 공개 정적 파일에 가상 메모가 보이는지
-  const dataResponse = await get(new URL('/data.json', app));
+  const dataResponse = await get(new URL('/data.json', app), 'public_data_json_note_leak');
   let dataNoteCount = null;
   if (dataResponse.ok) {
     try {
@@ -62,28 +73,18 @@ export async function runAttackChecks(config) {
   attempts.push({
     attackId: 'public_data_json_note_leak',
     expected: '비로그인 /data.json 요청에 가상 메모가 보이면 안 됨',
-    observed: dataLeaked
-      ? `비로그인 요청에서 메모가 보임 (HTTP ${dataResponse.status}, notes 길이 ${dataNoteCount})`
-      : `비로그인 요청에서 메모가 보이지 않음 (HTTP ${dataResponse.status}, notes 길이 ${dataNoteCount ?? 0})`,
+    // 문제가 없으면 상태만, 메모가 보이면 그 사실을 덧붙입니다(좋아 보이게 바꾸지 않음).
+    observed: `HTTP ${dataResponse.status}${dataLeaked ? '; notes_visible' : ''}`,
   });
 
   // 2~6) 비로그인 보호 경로 요청: 401 또는 403과 JSON 오류로 거부되어야 합니다.
   async function anonymousDenied({ attackId, path, label, expectedPath }) {
-    const response = await get(new URL(path, app));
-    let isJson = false;
-    try {
-      const body = await response.json();
-      isJson = body !== null && typeof body === 'object';
-    } catch {
-      // A non-JSON body fails the "JSON 오류" requirement.
-    }
-    const rejected = (response.status === 401 || response.status === 403) && isJson;
+    const response = await get(new URL(path, app), attackId);
+    await response.text(); // 본문은 기록하지 않고 읽어서 닫기만 합니다.
     attempts.push({
       attackId,
-      expected: `비로그인 GET ${expectedPath}는 401 또는 403과 JSON 오류로 거부되어야 함`,
-      observed: rejected
-        ? `비로그인 ${label} 요청이 거부됨 (HTTP ${response.status}, JSON 응답)`
-        : `비로그인 ${label} 요청이 기대대로 거부되지 않음 (HTTP ${response.status}, JSON 응답 ${isJson})`,
+      expected: `비로그인 GET ${expectedPath}(${label})는 401 또는 403과 JSON 오류로 거부되어야 함`,
+      observed: `HTTP ${response.status}`,
     });
   }
   await anonymousDenied({ attackId: 'anonymous_notes_api_denied', path: '/api/notes', label: '공용 자료', expectedPath: '/api/notes' });
@@ -105,35 +106,31 @@ export async function runAttackChecks(config) {
   // 7) 5단계: 원본 Supabase 자료 API(originalApiUrl)를 anon 키로 우리 서버를 거치지 않고 직접
   // 조회해도 거부되어야 합니다. 심판도 anon 키로만 확인하며 authenticated 역할은 대상이 아닙니다.
   if (typeof config.originalApiUrl === 'string' && config.originalApiUrl.startsWith('https://')) {
-    const readResponse = await get(`${config.originalApiUrl}?select=id`, {
+    const readResponse = await get(`${config.originalApiUrl}?select=id`, 'anon_direct_original_api_read_denied', {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
     });
-    const rejected = readResponse.status === 401 || readResponse.status === 403;
+    await readResponse.text();
     attempts.push({
       attackId: 'anon_direct_original_api_read_denied',
       expected: 'anon 키로 원본 Supabase 자료 API(originalApiUrl)를 직접 조회하면 거부되어야 함',
-      observed: rejected
-        ? `anon 키 직접 조회가 거부됨 (HTTP ${readResponse.status})`
-        : `anon 키 직접 조회가 거부되지 않음 (HTTP ${readResponse.status})`,
+      observed: `HTTP ${readResponse.status}`,
     });
   }
 
   // 8) 5단계: 공개 첫 화면에 서버 전용 키가 섞여 있으면 안 됩니다.
-  const homeResponse = await get(app);
+  const homeResponse = await get(app, 'static_bundle_no_secret_key');
   const homeText = await homeResponse.text();
   attempts.push({
     attackId: 'static_bundle_no_secret_key',
     expected: '첫 화면 응답에 서버 전용 키(sb_secret_...) 문자열이 없어야 함',
-    observed: SECRET_KEY_PATTERN.test(homeText)
-      ? '첫 화면 응답에서 서버 전용 키 패턴이 발견됨'
-      : '첫 화면 응답에서 서버 전용 키 패턴이 발견되지 않음',
+    observed: `HTTP ${homeResponse.status}${SECRET_KEY_PATTERN.test(homeText) ? '; secret_key_pattern' : ''}`,
   });
 
   // 9) 요청을 보내지 않은 점검: 제출 묶음은 GET·HEAD만 보낼 수 있습니다(S12_BUNDLE_UNSUPPORTED).
   attempts.push({
     attackId: 'anon_direct_original_api_write_denied',
-    expected: 'anon 키로 원본 Supabase 자료 API(originalApiUrl)를 직접 수정(추가)하면 거부되어야 함',
-    observed: 'not_run: 제출 묶음은 GET·HEAD만 보낼 수 있어 쓰기(POST) 요청은 보내지 않았습니다. 이 항목은 확인하지 않았습니다.',
+    expected: 'anon 키로 원본 Supabase 자료 API(originalApiUrl)를 직접 수정(추가)하면 거부되어야 함 (제출 묶음은 GET·HEAD만 보낼 수 있어 요청을 보내지 않음)',
+    observed: 'not_run',
   });
 
   return attempts;
