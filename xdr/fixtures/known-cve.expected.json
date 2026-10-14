@@ -1,0 +1,12 @@
+{
+  "_notice": "시험용 기대값입니다. 운영 측 연습 경보(xdr/fixtures/known-cve.json)의 설명·요청 값을 읽고 직접 붙인 묶음 표시이며, 심판의 정답표가 아닙니다(운영 측 xdr/README.md는 '명확한 공격, 애매한 시도, 정상 이벤트가 함께 들어 있다'고만 설명합니다). 판단(decide.mjs)에는 쓰지 않고, 실행 뒤 확인(정상 이벤트 오차단·묶음별 결과)에만 씁니다.",
+  "_labels": "attack=명확한 공격(차단 기대), ambiguous=애매한 시도(알림 기대), benign=정상 이벤트(기록만 기대, 차단되면 오차단)",
+  "byAlertId": {
+    "kc-01": "attack", "kc-02": "attack", "kc-03": "attack", "kc-04": "attack",
+    "kc-05": "attack", "kc-06": "attack", "kc-07": "attack", "kc-08": "attack",
+    "kc-09": "ambiguous", "kc-10": "ambiguous", "kc-11": "ambiguous", "kc-12": "ambiguous",
+    "kc-13": "ambiguous", "kc-14": "ambiguous", "kc-15": "ambiguous", "kc-16": "ambiguous",
+    "kc-17": "benign", "kc-18": "benign", "kc-19": "benign", "kc-20": "benign",
+    "kc-21": "benign", "kc-22": "benign", "kc-23": "benign", "kc-24": "benign"
+  }
+}

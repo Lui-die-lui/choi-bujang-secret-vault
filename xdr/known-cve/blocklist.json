@@ -1,0 +1,66 @@
+[
+  {
+    "sourceIp": "203.0.113.10",
+    "expiresAtMs": 1791946933217,
+    "reason": "패턴 jndi_lookup_in_request_header: CVE-2021-44228: 공격자가 통제하는 값이 로그에 남는 머리글에 JNDI 조회 구문을 넣는 알려진 악용 형태입니다.",
+    "basisAlertIds": [
+      "kc-01",
+      "kc-02"
+    ],
+    "createdAtMs": 1791943333217
+  },
+  {
+    "sourceIp": "198.51.100.16",
+    "expiresAtMs": 1791946933217,
+    "reason": "패턴 jndi_lookup_repeated: CVE-2021-44228 악용 구문이 여러 곳에 있거나 반복되면 우연한 입력으로 보기 어렵습니다.",
+    "basisAlertIds": [
+      "kc-03"
+    ],
+    "createdAtMs": 1791943333217
+  },
+  {
+    "sourceIp": "192.0.2.16",
+    "expiresAtMs": 1791946933217,
+    "reason": "패턴 jndi_lookup_repeated: CVE-2021-44228 악용 구문이 여러 곳에 있거나 반복되면 우연한 입력으로 보기 어렵습니다.",
+    "basisAlertIds": [
+      "kc-04"
+    ],
+    "createdAtMs": 1791943333217
+  },
+  {
+    "sourceIp": "203.0.113.24",
+    "expiresAtMs": 1791946933217,
+    "reason": "패턴 jndi_lookup_in_request_argument: CVE-2021-44228: 요청 인자가 로그 메시지에 들어가는 지점을 노린 알려진 악용 형태입니다.",
+    "basisAlertIds": [
+      "kc-05"
+    ],
+    "createdAtMs": 1791943333217
+  },
+  {
+    "sourceIp": "198.51.100.24",
+    "expiresAtMs": 1791946933217,
+    "reason": "패턴 jndi_lookup_repeated: CVE-2021-44228 악용 구문이 여러 곳에 있거나 반복되면 우연한 입력으로 보기 어렵습니다.",
+    "basisAlertIds": [
+      "kc-06"
+    ],
+    "createdAtMs": 1791943333217
+  },
+  {
+    "sourceIp": "192.0.2.24",
+    "expiresAtMs": 1791946933217,
+    "reason": "패턴 jndi_lookup_in_request_header: CVE-2021-44228: 공격자가 통제하는 값이 로그에 남는 머리글에 JNDI 조회 구문을 넣는 알려진 악용 형태입니다.",
+    "basisAlertIds": [
+      "kc-07"
+    ],
+    "createdAtMs": 1791943333217
+  },
+  {
+    "sourceIp": "203.0.113.31",
+    "expiresAtMs": 1791946933217,
+    "reason": "패턴 jndi_lookup_repeated: CVE-2021-44228 악용 구문이 여러 곳에 있거나 반복되면 우연한 입력으로 보기 어렵습니다.",
+    "basisAlertIds": [
+      "kc-08"
+    ],
+    "createdAtMs": 1791943333217
+  }
+]

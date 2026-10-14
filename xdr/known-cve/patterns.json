@@ -1,0 +1,98 @@
+{
+  "_notice": "알려진 취약점(CVE-2021-44228, Log4Shell) 악용 요청의 알려진 형태를 정리한 목록입니다. decide.mjs는 심판의 격리 환경(import 없음) 때문에 이 패턴들을 파일 맨 위에 직접 옮겨 적어 둡니다 — 이 파일을 고치면 decide.mjs의 PATTERNS 상수도 같이 고쳐 주세요. 순서는 확신도 내림차순입니다. 기준 숫자·낱말 목록·확신도는 운영 측 연습 경보(xdr/fixtures/known-cve.json)의 모양을 읽고 직접 정한 값이며 심판의 정답표에서 가져온 값이 아닙니다. 경보 ID·출발 주소·묶음 표시는 어떤 조건에도 쓰지 않습니다.",
+  "sources": [
+    {
+      "id": "cve-2021-44228",
+      "title": "NVD CVE-2021-44228 Detail",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228",
+      "checked": "NVD REST API(services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2021-44228)로 2026-10-14에 확인: Apache Log4j2 2.0-beta9부터 2.15.0까지(보안 릴리스 2.12.2·2.12.3·2.3.1 제외)에서 JNDI 기능이 공격자가 통제하는 LDAP 등 JNDI 관련 끝점을 막지 않아, 로그 메시지나 인자를 통제할 수 있는 공격자가 LDAP 서버의 코드를 실행할 수 있다는 설명을 확인함."
+    },
+    {
+      "id": "mitre-t1190",
+      "title": "MITRE ATT&CK T1190 Exploit Public-Facing Application",
+      "url": "https://attack.mitre.org/techniques/T1190/",
+      "checked": "2026-10-14에 확인: 전술 Initial Access, '인터넷에 노출된 호스트·시스템의 약점을 악용해 네트워크에 처음 접근하는' 기법. 이것은 공격 기법 분류이며 탐지 신호로 쓰지 않음(경보의 rule.mitre 값을 읽지 않음)."
+    },
+    {
+      "id": "mitre-t1595-002",
+      "title": "MITRE ATT&CK T1595.002 Active Scanning: Vulnerability Scanning",
+      "url": "https://attack.mitre.org/techniques/T1595/002/",
+      "checked": "2026-10-14에 확인: 공격자가 대상의 소프트웨어·설정이 특정 악용의 조건에 맞는지 확인하려고 취약점을 점검하는 기법. 절차 예시에 Vulmap, Acunetix, MASSCAN, JexBoss, Interactsh가 나옴."
+    }
+  ],
+  "input": "경보 한 건에서 네 가지를 봅니다. (1) 요청 머리글 값: data의 useragent·referer·header 계열 문자열. (2) 요청 인자 값: data의 url 등 나머지 문자열(srcip·srcuser·count 제외). (3) 반복 횟수: data.count(없으면 1). (4) 규칙 수준과 설명: rule.level, rule.description. 요청 값은 소문자로 바꾸고 퍼센트 인코딩을 최대 두 번 풀고, ${lower:x}·${upper:x}·${::-x} 형태의 한 글자 대체를 최대 세 번 풀어 낱말을 맞춥니다(그 밖의 우회 표기는 해석하지 않음). rule.mitre는 읽지 않습니다.",
+  "patterns": [
+    {
+      "name": "jndi_lookup_scanner_trace",
+      "signal": "lookup_syntax_with_scanner",
+      "confidence": 0.97,
+      "condition": "요청 머리글·인자에 완전한 JNDI 원격 조회 구문(${jndi:ldap://… 등 지원하는 전송 이름 + ://)이 있고, 같은 요청 값에 알려진 취약점 점검 도구 이름도 있음.",
+      "reference": "CVE-2021-44228 악용 구문에 T1595.002 점검 도구 흔적이 함께 있어 자동 점검 뒤 악용으로 이어진 요청입니다."
+    },
+    {
+      "name": "jndi_lookup_repeated",
+      "signal": "lookup_syntax_repeated",
+      "confidence": 0.95,
+      "condition": "완전한 JNDI 원격 조회 구문이 요청 머리글과 인자에 모두 있거나, 반복 횟수(data.count)가 3 이상.",
+      "reference": "CVE-2021-44228 악용 구문이 여러 곳에 있거나 반복되면 우연한 입력으로 보기 어렵습니다."
+    },
+    {
+      "name": "jndi_lookup_in_request_header",
+      "signal": "lookup_syntax_header",
+      "confidence": 0.92,
+      "condition": "요청 머리글 값(useragent·referer·header 계열)에 완전한 JNDI 원격 조회 구문이 있음.",
+      "reference": "CVE-2021-44228: 공격자가 통제하는 값이 로그에 남는 머리글에 JNDI 조회 구문을 넣는 알려진 악용 형태입니다."
+    },
+    {
+      "name": "jndi_lookup_in_request_argument",
+      "signal": "lookup_syntax_argument",
+      "confidence": 0.9,
+      "condition": "요청 인자 값(주소의 쿼리·경로 등)에 완전한 JNDI 원격 조회 구문이 있음.",
+      "reference": "CVE-2021-44228: 요청 인자가 로그 메시지에 들어가는 지점을 노린 알려진 악용 형태입니다."
+    },
+    {
+      "name": "incomplete_lookup_fragment",
+      "signal": "lookup_syntax_partial",
+      "confidence": 0.7,
+      "condition": "요청 값에 ${jndi 또는 jndi:ldap 같은 조회 구문의 일부가 있으나 전송 이름과 ://까지 갖춘 완전한 구문은 아님.",
+      "reference": "CVE-2021-44228 악용 구문의 일부만 있는 시도로, 악용 여부를 단정할 수 없어 알림으로만 남깁니다."
+    },
+    {
+      "name": "scanner_tool_trace",
+      "signal": "scanner_name_in_request",
+      "confidence": 0.6,
+      "condition": "요청 머리글·인자에 취약점 점검 도구 이름(vulmap, acunetix, masscan, jexboss, interactsh, interact.sh)이 있고 완전한 조회 구문은 없음.",
+      "reference": "MITRE ATT&CK T1595.002 절차 예시에 나오는 점검 도구의 흔적입니다. 점검만으로는 악용이 일어났다고 볼 수 없어 알림으로만 남깁니다."
+    },
+    {
+      "name": "lookup_syntax_in_description_only",
+      "signal": "lookup_syntax_in_text",
+      "confidence": 0.55,
+      "condition": "경보 설명 문장에 완전한 JNDI 조회 구문이 있으나 요청 머리글·인자에는 없음.",
+      "reference": "구문이 설명 문장에만 있고 요청에서 확인되지 않아 악용으로 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "name": "cve_or_component_reference_in_request",
+      "signal": "weak_keyword_in_request",
+      "confidence": 0.55,
+      "condition": "규칙 수준이 5 이상이고, 요청 머리글·인자에 CVE 번호 형태·jndi·log4j·log4shell 낱말만 있고 조회 구문은 없음.",
+      "reference": "CVE-2021-44228 관련 낱말만으로는 악용 구문이 아니므로(검색·문서 열람일 수 있음) 알림으로만 남깁니다."
+    },
+    {
+      "name": "vuln_wording_in_description_only",
+      "signal": "weak_keyword_in_description",
+      "confidence": 0.5,
+      "condition": "규칙 수준이 5 이상이고, 요청 값에는 근거가 없으나 경보 설명에 취약점·원격 조회·점검 도구·라이브러리 관련 낱말이 있음.",
+      "reference": "설명 문장의 낱말만으로는 악용을 확인할 수 없어 사람이 볼 수 있게 알림으로만 남깁니다."
+    }
+  ],
+  "defaults": {
+    "no_known_exploit_pattern": { "confidence": 0.05, "reference": "알려진 악용 패턴과 맞지 않는 요청입니다." },
+    "below_attention_level": { "confidence": 0.2, "reference": "관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다." }
+  },
+  "thresholds": { "block": 0.85, "alert": 0.5, "attentionRuleLevel": 5, "repeatedCount": 3 },
+  "lookupSchemes": ["ldap", "ldaps", "rmi", "dns", "iiop", "nis", "corba", "http", "https"],
+  "scannerNames": ["vulmap", "acunetix", "masscan", "jexboss", "interactsh", "interact.sh"],
+  "headerFields": ["useragent", "user_agent", "referer", "referrer", "header", "headers"],
+  "ignoredDataFields": ["srcip", "srcuser", "count", "id"]
+}
