@@ -20,7 +20,10 @@ export async function runAttackChecks(config) {
   // 9단계: 탐지 규칙(burst_read)과 회수 제안은 src/detect.mjs가 결과만 돌려주고 이 앱의
   // api/*.mjs가 호출하지 않아 실제 HTTP로 점검할 길이 없습니다(npm run detect:test 가상
   // 사건 연습만 실행, 운영 엔진의 사건 전달·회수는 미실행).
-  // 10단계: 복원 경로(POST /api/note-restore/:id)는 비로그인 거부만 실제 HTTP로
+  // 12단계 보완: 심판의 격리 환경은 제출 묶음이 GET·HEAD 요청만 보내도록 허용합니다
+  // (S12_BUNDLE_UNSUPPORTED). 그래서 이 점검은 POST·PUT 등 쓰기 요청을 보내지 않습니다.
+  // 쓰기 요청이 필요한 점검(복원 실행, 원본 API 직접 추가)은 observed를 not_run으로 남깁니다.
+  // 10단계: 복원 경로(GET /api/note-restore/:id 미리보기)는 비로그인 거부만 실제 HTTP로
   // 점검합니다. 시험 계정 B의 변조·삭제 뒤 복원은 이 점검에 계정 토큰을 넣지 않으므로
   // 미실행입니다(npm run test:restore 인메모리 대역으로만 확인).
   // 11단계: 기기 승인 등록부 경로(GET /api/device/challenge)는 비로그인 거부만 실제 HTTP로
@@ -71,7 +74,7 @@ export async function runAttackChecks(config) {
   const myNotesCheck = await checkAnonymousRejected('/api/my-notes');
   // 10단계: 실제 자료가 아닌 고정 가상 ID로 비로그인 복원 요청을 보냅니다.
   const restoreCheck = config.step >= 10 ? await checkAnonymousRejected(
-    '/api/note-restore/00000000-0000-4000-8000-000000000000', 'POST') : null;
+    '/api/note-restore/00000000-0000-4000-8000-000000000000') : null;
   // 12단계: 탈환 작전실 API도 비로그인 거부만 실제 HTTP로 점검합니다. 로그인·승인 기기로 보내는
   // 시험(회수된 신원, 복구 뒤 변경 요청 등)은 계정·패스키가 필요해 npm run ops:verify와
   // docs/OPS_VERIFY.md의 수동 절차로 따로 기록하며, 이 점검에는 넣지 않습니다(미실행).
@@ -83,7 +86,6 @@ export async function runAttackChecks(config) {
   // 심판도 anon 키로만 확인하며, 재현할 수 없는 authenticated 역할의 직접
   // 접근은 이 점검 대상이 아닙니다.
   let readCheck = { status: null, rejected: false };
-  let writeCheck = { status: null, rejected: false };
   if (typeof config.originalApiUrl === 'string' && config.originalApiUrl.startsWith('https://')) {
     const readResponse = await fetch(`${config.originalApiUrl}?select=id`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
@@ -91,17 +93,7 @@ export async function runAttackChecks(config) {
     });
     readCheck = { status: readResponse.status, rejected: readResponse.status === 401 || readResponse.status === 403 };
 
-    const writeResponse = await fetch(config.originalApiUrl, {
-      method: 'POST',
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ title: 'attack-check', content: 'attack-check' }),
-      signal: AbortSignal.timeout(10000),
-    });
-    writeCheck = { status: writeResponse.status, rejected: writeResponse.status === 401 || writeResponse.status === 403 };
+    // 원본 API 직접 추가(POST)는 제출 묶음이 쓰기 요청을 보낼 수 없어 보내지 않습니다(not_run).
   }
 
   // 5단계: 공개 정적 파일(첫 화면)에 서버 전용 키가 섞여 있으면 안 됩니다.
@@ -133,7 +125,7 @@ export async function runAttackChecks(config) {
     },
     ...(restoreCheck ? [{
       attackId: 'anonymous_note_restore_denied',
-      expected: '비로그인 POST /api/note-restore/:id는 401 또는 403과 JSON 오류로 거부되어야 함',
+      expected: '비로그인 GET /api/note-restore/:id(복원 미리보기)는 401 또는 403과 JSON 오류로 거부되어야 함',
       observed: restoreCheck.rejected && restoreCheck.isJson
         ? `비로그인 복원 요청이 거부됨 (HTTP ${restoreCheck.status}, JSON 응답)`
         : `비로그인 복원 요청이 기대대로 거부되지 않음 (HTTP ${restoreCheck.status}, JSON 응답 ${restoreCheck.isJson})`,
@@ -163,9 +155,7 @@ export async function runAttackChecks(config) {
     {
       attackId: 'anon_direct_original_api_write_denied',
       expected: 'anon 키로 원본 Supabase 자료 API(originalApiUrl)를 직접 수정(추가)하면 거부되어야 함',
-      observed: writeCheck.rejected
-        ? `anon 키 직접 추가가 거부됨 (HTTP ${writeCheck.status})`
-        : `anon 키 직접 추가가 거부되지 않음 (HTTP ${writeCheck.status})`,
+      observed: 'not_run: 제출 묶음은 GET·HEAD만 보낼 수 있어 쓰기(POST) 요청은 보내지 않았습니다. 이 항목은 확인하지 않았습니다.',
     },
     {
       attackId: 'static_bundle_no_secret_key',

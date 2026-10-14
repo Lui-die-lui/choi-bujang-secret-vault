@@ -127,7 +127,7 @@
 
 ```
 npm run ops:verify        # artifacts/ops-verify.json 과 표를 출력(Git에 올리지 않음)
-npm run bundle            # 제출 묶음 artifacts/submission.json (직접 점검 결과 포함, 심판 판정 아님)
+npm run bundle            # 제출 묶음 artifacts/submission.json (직접 점검 결과 포함, 심판 판정 아님. GET·HEAD 요청만 보내며 쓰기 점검은 not_run)
 ```
 
 수동 항목과 서버 기록 대조 절차는 [docs/OPS_VERIFY.md](docs/OPS_VERIFY.md)에 있습니다.
