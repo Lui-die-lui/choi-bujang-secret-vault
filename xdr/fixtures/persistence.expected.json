@@ -1,0 +1,12 @@
+{
+  "_notice": "시험용 기대값입니다. 운영 측 연습 경보(xdr/fixtures/persistence.json)의 설명·경로·규칙 수준을 읽고 직접 붙인 묶음 표시이며, 심판의 정답표가 아닙니다(운영 측 xdr/README.md는 '명확한 공격, 애매한 시도, 정상 이벤트가 함께 들어 있다'고만 설명합니다). 판단(decide.mjs)에는 쓰지 않고, 실행 뒤 확인(정상 이벤트 오차단·묶음별 결과)에만 씁니다.",
+  "_labels": "attack=명확한 공격(차단 기대), ambiguous=애매한 시도(알림 기대), benign=정상 이벤트(기록만 기대, 차단되면 오차단)",
+  "byAlertId": {
+    "ps-01": "attack", "ps-02": "attack", "ps-03": "attack", "ps-04": "attack",
+    "ps-05": "attack", "ps-06": "attack", "ps-07": "attack", "ps-08": "attack",
+    "ps-09": "ambiguous", "ps-10": "ambiguous", "ps-11": "ambiguous", "ps-12": "ambiguous",
+    "ps-13": "ambiguous", "ps-14": "ambiguous", "ps-15": "ambiguous", "ps-16": "ambiguous",
+    "ps-17": "benign", "ps-18": "benign", "ps-19": "benign", "ps-20": "benign",
+    "ps-21": "benign", "ps-22": "benign", "ps-23": "benign", "ps-24": "benign"
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "persistence",
+  "decisions": [
+    {
+      "alertId": "ps-01",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "패턴 unsigned_persistence_temp_path: T1543·T1053·T1547.001: 서명 없는 프로그램이 임시 폴더에서 서비스·예약 작업·시작 항목으로 걸리는 것은 지속성 설치의 전형적인 조합입니다."
+    },
+    {
+      "alertId": "ps-02",
+      "action": "block",
+      "confidence": 0.92,
+      "reason": "패턴 new_persistence_temp_path: T1543·T1053: 평소에 없던 항목이 임시 폴더의 프로그램을 가리키는 것은 새로 심은 프로그램의 전형입니다."
+    },
+    {
+      "alertId": "ps-03",
+      "action": "block",
+      "confidence": 0.86,
+      "reason": "패턴 startup_folder_new_entry: T1547.001: 시작 폴더에 평소 목록에 없는 실행 항목이 추가되면 로그온 때 자동 실행되는 지속 수단일 수 있습니다. 새 항목·시작 폴더 경로·높은 규칙 수준이 함께 있을 때만 block합니다."
+    },
+    {
+      "alertId": "ps-04",
+      "action": "block",
+      "confidence": 0.94,
+      "reason": "패턴 unsigned_service_repeated_or_remote: T1543: 서명 없는 서비스 등록이 반복되거나 원격에서 오면 관리 작업보다 자동화된 설치에 가깝습니다."
+    },
+    {
+      "alertId": "ps-05",
+      "action": "block",
+      "confidence": 0.88,
+      "reason": "패턴 random_task_name_temp_path: T1053: 임의 문자열 이름의 작업이 임시 폴더 프로그램을 실행하는 것은 자동 생성된 악성 작업의 흔적입니다."
+    },
+    {
+      "alertId": "ps-06",
+      "action": "block",
+      "confidence": 0.97,
+      "reason": "패턴 unsigned_persistence_temp_path: T1543·T1053·T1547.001: 서명 없는 프로그램이 임시 폴더에서 서비스·예약 작업·시작 항목으로 걸리는 것은 지속성 설치의 전형적인 조합입니다."
+    },
+    {
+      "alertId": "ps-07",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "패턴 persistence_multi_vector_temp_file: T1543·T1053·T1547.001: 같은 임시 파일을 여러 지속 수단이 함께 가리키면 다시 켜도 살아남게 겹겹이 심은 것입니다."
+    },
+    {
+      "alertId": "ps-08",
+      "action": "block",
+      "confidence": 0.92,
+      "reason": "패턴 new_persistence_temp_path: T1543·T1053: 평소에 없던 항목이 임시 폴더의 프로그램을 가리키는 것은 새로 심은 프로그램의 전형입니다."
+    },
+    {
+      "alertId": "ps-09",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 persistence_unknown_signature: T1543·T1053·T1547.001: 서명 여부를 모르는 새 지속 항목은 수업 도구일 수도 있어 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-10",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 persistence_unknown_signature: T1543·T1053·T1547.001: 서명 여부를 모르는 새 지속 항목은 수업 도구일 수도 있어 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-11",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 persistence_event_attention: T1543·T1053·T1547.001: 지속 수단 관련 사건이지만 악용 증거가 부족해 사람이 볼 수 있게 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-12",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 persistence_event_attention: T1543·T1053·T1547.001: 지속 수단 관련 사건이지만 악용 증거가 부족해 사람이 볼 수 있게 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-13",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 temp_executable_without_registration: T1543: 임시 폴더의 실행 파일만으로는 지속성이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-14",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 persistence_event_attention: T1543·T1053·T1547.001: 지속 수단 관련 사건이지만 악용 증거가 부족해 사람이 볼 수 있게 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-15",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 persistence_event_attention: T1543·T1053·T1547.001: 지속 수단 관련 사건이지만 악용 증거가 부족해 사람이 볼 수 있게 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-16",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 persistence_event_attention: T1543·T1053·T1547.001: 지속 수단 관련 사건이지만 악용 증거가 부족해 사람이 볼 수 있게 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ps-17",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_persistence_pattern): 알려진 지속성 악용 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ps-18",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_persistence_pattern): 알려진 지속성 악용 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ps-19",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "ps-20",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "ps-21",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_persistence_pattern): 알려진 지속성 악용 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ps-22",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_persistence_pattern): 알려진 지속성 악용 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ps-23",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "ps-24",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_persistence_pattern): 알려진 지속성 악용 패턴과 맞지 않는 사건입니다."
+    }
+  ],
+  "counts": {
+    "block": 8,
+    "alert": 8,
+    "record": 8
+  },
+  "generatedAt": "2026-10-14T02:15:54.857Z",
+  "totalAlerts": 24,
+  "readAlertsRows": 24,
+  "loggedLinesThisRun": 24,
+  "countsSum": 24,
+  "patternsInSyncWithDecide": true,
+  "patternCount": 9,
+  "labelsAvailable": true,
+  "falsePositiveCount": 0,
+  "falsePositiveAlertIds": [],
+  "normalInDenyRuleCount": 0,
+  "normalInDenyRuleAlertIds": [],
+  "labelMismatchAlertIds": [],
+  "nonBlockBasisInRulesCount": 0,
+  "activeRuleCountAfterExpiry": 0,
+  "heldBackBlockAlertIds": [],
+  "ruleChangesThisRun": {
+    "created": 0,
+    "extended": 0,
+    "unchanged": 8
+  },
+  "blockRuleCount": 7,
+  "blockRules": [
+    {
+      "sourceIp": "203.0.113.12",
+      "expiresAt": "2026-10-14T03:15:25.114Z",
+      "basisAlertIds": [
+        "ps-01",
+        "ps-02"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.12",
+      "expiresAt": "2026-10-14T03:15:25.114Z",
+      "basisAlertIds": [
+        "ps-03"
+      ]
+    },
+    {
+      "sourceIp": "192.0.2.12",
+      "expiresAt": "2026-10-14T03:15:25.114Z",
+      "basisAlertIds": [
+        "ps-04"
+      ]
+    },
+    {
+      "sourceIp": "203.0.113.19",
+      "expiresAt": "2026-10-14T03:15:25.114Z",
+      "basisAlertIds": [
+        "ps-05"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.19",
+      "expiresAt": "2026-10-14T03:15:25.114Z",
+      "basisAlertIds": [
+        "ps-06"
+      ]
+    },
+    {
+      "sourceIp": "192.0.2.19",
+      "expiresAt": "2026-10-14T03:15:25.114Z",
+      "basisAlertIds": [
+        "ps-07"
+      ]
+    },
+    {
+      "sourceIp": "203.0.113.33",
+      "expiresAt": "2026-10-14T03:15:25.114Z",
+      "basisAlertIds": [
+        "ps-08"
+      ]
+    }
+  ],
+  "note": "운영 측 연습 경보 기준의 로컬 결과입니다. 정상 오차단은 직접 붙인 묶음 표시(persistence.expected.json, 심판의 정답표가 아님) 기준으로만 셉니다. 규칙은 xdr/persistence/blocklist.json에만 있고 학생 판정기(src/decider.mjs)나 실제 요청 처리 경로에는 연결되지 않았습니다(요청 계약에 출발 주소가 없음). 심판 판정 결과가 아닙니다."
+}

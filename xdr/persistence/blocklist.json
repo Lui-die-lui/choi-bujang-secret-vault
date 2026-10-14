@@ -1,0 +1,66 @@
+[
+  {
+    "sourceIp": "203.0.113.12",
+    "expiresAtMs": 1791947725114,
+    "reason": "패턴 unsigned_persistence_temp_path: T1543·T1053·T1547.001: 서명 없는 프로그램이 임시 폴더에서 서비스·예약 작업·시작 항목으로 걸리는 것은 지속성 설치의 전형적인 조합입니다.",
+    "basisAlertIds": [
+      "ps-01",
+      "ps-02"
+    ],
+    "createdAtMs": 1791944125114
+  },
+  {
+    "sourceIp": "198.51.100.12",
+    "expiresAtMs": 1791947725114,
+    "reason": "패턴 startup_folder_new_entry: T1547.001: 시작 폴더에 평소 목록에 없는 실행 항목이 추가되면 로그온 때 자동 실행되는 지속 수단일 수 있습니다. 새 항목·시작 폴더 경로·높은 규칙 수준이 함께 있을 때만 block합니다.",
+    "basisAlertIds": [
+      "ps-03"
+    ],
+    "createdAtMs": 1791944125114
+  },
+  {
+    "sourceIp": "192.0.2.12",
+    "expiresAtMs": 1791947725114,
+    "reason": "패턴 unsigned_service_repeated_or_remote: T1543: 서명 없는 서비스 등록이 반복되거나 원격에서 오면 관리 작업보다 자동화된 설치에 가깝습니다.",
+    "basisAlertIds": [
+      "ps-04"
+    ],
+    "createdAtMs": 1791944125114
+  },
+  {
+    "sourceIp": "203.0.113.19",
+    "expiresAtMs": 1791947725114,
+    "reason": "패턴 random_task_name_temp_path: T1053: 임의 문자열 이름의 작업이 임시 폴더 프로그램을 실행하는 것은 자동 생성된 악성 작업의 흔적입니다.",
+    "basisAlertIds": [
+      "ps-05"
+    ],
+    "createdAtMs": 1791944125114
+  },
+  {
+    "sourceIp": "198.51.100.19",
+    "expiresAtMs": 1791947725114,
+    "reason": "패턴 unsigned_persistence_temp_path: T1543·T1053·T1547.001: 서명 없는 프로그램이 임시 폴더에서 서비스·예약 작업·시작 항목으로 걸리는 것은 지속성 설치의 전형적인 조합입니다.",
+    "basisAlertIds": [
+      "ps-06"
+    ],
+    "createdAtMs": 1791944125114
+  },
+  {
+    "sourceIp": "192.0.2.19",
+    "expiresAtMs": 1791947725114,
+    "reason": "패턴 persistence_multi_vector_temp_file: T1543·T1053·T1547.001: 같은 임시 파일을 여러 지속 수단이 함께 가리키면 다시 켜도 살아남게 겹겹이 심은 것입니다.",
+    "basisAlertIds": [
+      "ps-07"
+    ],
+    "createdAtMs": 1791944125114
+  },
+  {
+    "sourceIp": "203.0.113.33",
+    "expiresAtMs": 1791947725114,
+    "reason": "패턴 new_persistence_temp_path: T1543·T1053: 평소에 없던 항목이 임시 폴더의 프로그램을 가리키는 것은 새로 심은 프로그램의 전형입니다.",
+    "basisAlertIds": [
+      "ps-08"
+    ],
+    "createdAtMs": 1791944125114
+  }
+]

@@ -1,0 +1,99 @@
+{
+  "_notice": "다시 켜도 살아남도록 심어 둔 프로그램(지속성)의 알려진 형태를 정리한 목록입니다. decide.mjs는 심판의 격리 환경(import 없음) 때문에 이 패턴들을 파일 맨 위에 직접 옮겨 적어 둡니다 — 이 파일을 고치면 decide.mjs의 PATTERNS 상수도 같이 고쳐 주세요. 순서는 확신도 내림차순입니다. 기준 숫자(규칙 수준 5·10, 반복 3회)와 낱말 목록·확신도는 운영 측 연습 경보(xdr/fixtures/persistence.json)의 모양을 읽고 직접 정한 가정이며 심판의 정답표에서 가져온 값이 아닙니다. 경보 ID·출발 주소·rule.mitre·묶음 표시는 어떤 조건에도 쓰지 않습니다.",
+  "sources": [
+    {
+      "id": "mitre-t1543",
+      "title": "MITRE ATT&CK T1543 Create or Modify System Process",
+      "url": "https://attack.mitre.org/techniques/T1543/",
+      "checked": "2026-10-14에 공식 페이지 확인: 전술 Persistence·Privilege Escalation. 공격자가 서비스 같은 시스템 수준 프로세스를 설치하거나 바꿔 악성 코드가 반복 실행되게 하는 기법."
+    },
+    {
+      "id": "mitre-t1053",
+      "title": "MITRE ATT&CK T1053 Scheduled Task/Job",
+      "url": "https://attack.mitre.org/techniques/T1053/",
+      "checked": "2026-10-14에 공식 페이지 확인: 전술 Execution·Persistence·Privilege Escalation. 운영체제의 작업 예약 도구로 악성 코드를 한 번 또는 반복해서 실행하는 기법."
+    },
+    {
+      "id": "mitre-t1547-001",
+      "title": "MITRE ATT&CK T1547.001 Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
+      "url": "https://attack.mitre.org/techniques/T1547/001/",
+      "checked": "2026-10-14에 공식 페이지 앞부분(전체 중 약 56%)을 확인: 레지스트리 실행 키나 시작 폴더에 프로그램을 두어 로그온 때 자동 실행되게 하는 하위 기법이며 시작 폴더가 언급됨. 페이지 뒷부분은 읽지 않음."
+    }
+  ],
+  "baseline": {
+    "state": "none_provided",
+    "note": "평소 서비스·예약 작업·시작 항목 목록이나 서명 승인 목록은 저장소와 운영 측 자료 어디에도 제공되지 않습니다. 그래서 임의의 정상 목록을 만들어 '목록 밖'을 판정하지 않고, 경보 설명 문장이 스스로 밝힌 사실(처음 보는, 평소 목록에 없는, 서명 없음 등)만 증거로 씁니다. 경보 필드에는 서명·해시 값이 없어 서명과 실행 파일 변경 여부도 설명 문장에서만 읽습니다."
+  },
+  "input": "경보 한 건에서 네 가지를 봅니다. (1) 설명: rule.description을 소문자로 바꾸고 마침표로 문장을 나눈 것. 문장이 '없습니다'·'그대로입니다'로 끝나면 그 문장의 항목은 부정된 것으로 보고 세지 않습니다. (2) 실행 경로: data.path를 소문자로 바꾸고 백슬래시를 구분자로 읽어 임시 폴더나 시작 폴더 아래인지만 봅니다(경로 원문은 출력·저장하지 않음). (3) 반복 횟수: data.count 또는 설명의 '연속으로 N건'. (4) 규칙 수준: rule.level. rule.mitre는 기법 분류라 읽지 않습니다.",
+  "patterns": [
+    {
+      "name": "unsigned_persistence_temp_path",
+      "signal": "unsigned_plus_temp_path",
+      "confidence": 0.95,
+      "condition": "서비스·예약 작업·시작 항목 등록·변경이면서 설명에 '서명 없음'이 있고 실행 경로가 임시 폴더 아래.",
+      "reference": "T1543·T1053·T1547.001: 서명 없는 프로그램이 임시 폴더에서 서비스·예약 작업·시작 항목으로 걸리는 것은 지속성 설치의 전형적인 조합입니다."
+    },
+    {
+      "name": "persistence_multi_vector_temp_file",
+      "signal": "multiple_vectors_same_temp_file",
+      "confidence": 0.93,
+      "condition": "한 경보에서 서비스·예약 작업·시작 항목 가운데 둘 이상이 함께 언급되고 실행 경로가 임시 폴더 아래.",
+      "reference": "T1543·T1053·T1547.001: 같은 임시 파일을 여러 지속 수단이 함께 가리키면 다시 켜도 살아남게 겹겹이 심은 것입니다."
+    },
+    {
+      "name": "unsigned_service_repeated_or_remote",
+      "signal": "unsigned_plus_repeat_or_remote",
+      "confidence": 0.92,
+      "condition": "서비스·예약 작업·시작 항목 등록이면서 '서명 없음'이 있고, 반복 횟수가 3 이상이거나 설명이 원격 주소에서의 등록을 밝힘.",
+      "reference": "T1543: 서명 없는 서비스 등록이 반복되거나 원격에서 오면 관리 작업보다 자동화된 설치에 가깝습니다."
+    },
+    {
+      "name": "new_persistence_temp_path",
+      "signal": "new_item_plus_temp_path",
+      "confidence": 0.9,
+      "condition": "서비스·예약 작업·시작 항목 등록이면서 설명이 '처음 보는'·'평소 목록에 없는' 새 항목임을 밝히고 실행 경로가 임시 폴더 아래.",
+      "reference": "T1543·T1053: 평소에 없던 항목이 임시 폴더의 프로그램을 가리키는 것은 새로 심은 프로그램의 전형입니다."
+    },
+    {
+      "name": "random_task_name_temp_path",
+      "signal": "random_name_plus_temp_path",
+      "confidence": 0.88,
+      "condition": "예약 작업·서비스 등록이면서 설명이 이름이 임의 문자열임을 밝히고 실행 경로가 임시 폴더 아래.",
+      "reference": "T1053: 임의 문자열 이름의 작업이 임시 폴더 프로그램을 실행하는 것은 자동 생성된 악성 작업의 흔적입니다."
+    },
+    {
+      "name": "startup_folder_new_entry",
+      "signal": "startup_new_item_high_level",
+      "confidence": 0.86,
+      "condition": "시작 폴더 항목 추가이면서 설명이 평소 목록에 없음을 밝히고, 실행 경로가 시작 폴더 아래이며, 규칙 수준이 10 이상.",
+      "reference": "T1547.001: 시작 폴더에 평소 목록에 없는 실행 항목이 추가되면 로그온 때 자동 실행되는 지속 수단일 수 있습니다. 새 항목·시작 폴더 경로·높은 규칙 수준이 함께 있을 때만 block합니다."
+    },
+    {
+      "name": "persistence_unknown_signature",
+      "signal": "persistence_with_unverified_signature",
+      "confidence": 0.6,
+      "condition": "서비스·예약 작업·시작 항목 등록·변경이면서 설명이 서명을 확인하지 못했거나 모른다고 밝히고, 위 block 조합에는 맞지 않음.",
+      "reference": "T1543·T1053·T1547.001: 서명 여부를 모르는 새 지속 항목은 수업 도구일 수도 있어 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "name": "temp_executable_without_registration",
+      "signal": "temp_path_without_persistence",
+      "confidence": 0.6,
+      "condition": "실행 경로가 임시 폴더 아래이고 규칙 수준이 5 이상이지만 서비스·예약 작업·시작 항목 등록은 확인되지 않음(설명이 등록 없음을 밝히거나 언급이 없음).",
+      "reference": "T1543: 임시 폴더의 실행 파일만으로는 지속성이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "name": "persistence_event_attention",
+      "signal": "persistence_wording_attention_level",
+      "confidence": 0.5,
+      "condition": "서비스·예약 작업·시작 항목 낱말이 있고 규칙 수준이 5 이상이지만 서명 없음·새 항목·임시 폴더 같은 보강 증거가 없음.",
+      "reference": "T1543·T1053·T1547.001: 지속 수단 관련 사건이지만 악용 증거가 부족해 사람이 볼 수 있게 알림으로만 남깁니다."
+    }
+  ],
+  "defaults": {
+    "no_known_persistence_pattern": { "confidence": 0.05, "reference": "알려진 지속성 악용 패턴과 맞지 않는 사건입니다." },
+    "below_attention_level": { "confidence": 0.2, "reference": "관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다." }
+  },
+  "boosts": { "perCorroboration": 0.02, "cap": 0.99, "corroborations": ["실행 파일 변경", "업무 시간 밖", "재부팅 뒤에도 남는 등록", "반복·원격"] },
+  "thresholds": { "block": 0.85, "alert": 0.5, "attentionRuleLevel": 5, "startupBlockRuleLevel": 10, "repeatedCount": 3 }
+}
