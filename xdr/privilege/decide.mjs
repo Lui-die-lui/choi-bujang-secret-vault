@@ -20,6 +20,8 @@ const BLOCK_THRESHOLD = 0.85;
 const ALERT_THRESHOLD = 0.5;
 const ATTENTION_RULE_LEVEL = 5;
 const MULTI_ACCOUNT_COUNT = 3;
+const RAPID_READD_MINUTES = 10;
+const RAPID_READD_RULE_LEVEL = 10;
 const BOOST = 0.02;
 const CAP = 0.99;
 
@@ -60,6 +62,11 @@ const PATTERNS = Object.freeze([
     reference: 'T1098: 업무 시간 밖의 관리자 권한 부여는 정상 관리 작업과 구분되는 보강 증거입니다. 시각만으로는 판단하지 않고 설명이 밝힌 경우에만 씁니다.',
   },
   {
+    name: 'admin_group_rapid_readd',
+    confidence: 0.86,
+    reference: 'T1098: 관리자 그룹에서 빠진 구성원이 몇 분 안에 다시 들어오면 권한 회수를 되돌려 접근을 유지하려는 조작일 수 있습니다. 짧은 간격·관리자 그룹·높은 규칙 수준이 함께 있을 때만 block합니다.',
+  },
+  {
     name: 'admin_group_membership_reapplied',
     confidence: 0.65,
     reference: 'T1098: 빠졌다가 다시 들어온 구성원은 실수 정정 같은 정상 관리 작업일 수도 있어 단독으로는 알림으로만 남깁니다.',
@@ -95,6 +102,7 @@ const OFF_HOURS = /(?:수업|업무)\s*시간\s*밖|업무처럼\s*보이지\s*�
 const OTHER_ACCOUNT = /다른\s*계정의\s*권한/u;
 const ACCOUNT_COUNT = /계정\s*(\d+)\s*개/u;
 const READDED = /빠진[^.]*다시/u;
+const INTERVAL = /(\d+)\s*(초|분)\s*(?:뒤|후|안에|만에)/u;
 const WEAK_WORD = /계정|그룹|권한|관리자|세션|승격/u;
 const ADMIN_GROUP_NAME = /^admin/iu;
 
@@ -139,7 +147,7 @@ export function decide(alert) {
     const sentences = text.split(/[.。]/u).map((part) => part.trim()).filter(Boolean);
     const facts = {
       privChange: false, adminCommand: false, genericCommand: false, fresh: false, unfamiliar: false,
-      offHours: false, otherAccount: false, readded: false, multiInText: 0,
+      offHours: false, otherAccount: false, readded: false, multiInText: 0, readdMinutes: null,
     };
     for (const sentence of sentences) {
       if (NEGATED_SENTENCE.test(sentence)) continue; // 부정된 문장의 행위는 세지 않습니다.
@@ -151,7 +159,11 @@ export function decide(alert) {
       if (UNFAMILIAR.test(sentence)) facts.unfamiliar = true;
       if (OFF_HOURS.test(sentence)) facts.offHours = true;
       if (OTHER_ACCOUNT.test(sentence)) facts.otherAccount = true;
-      if (READDED.test(sentence)) facts.readded = true;
+      if (READDED.test(sentence)) {
+        facts.readded = true;
+        const interval = INTERVAL.exec(sentence);
+        if (interval) facts.readdMinutes = interval[2] === '초' ? Number(interval[1]) / 60 : Number(interval[1]);
+      }
       const accounts = ACCOUNT_COUNT.exec(sentence);
       if (accounts) facts.multiInText = Math.max(facts.multiInText, Number(accounts[1]) || 0);
     }
@@ -171,6 +183,11 @@ export function decide(alert) {
     if (facts.privChange && multi) return fromPattern('admin_group_add_multiple_accounts', corroborations);
     if (facts.privChange && facts.unfamiliar) return fromPattern('admin_group_add_unfamiliar_origin', corroborations);
     if (facts.privChange && facts.offHours) return fromPattern('admin_group_add_off_hours', corroborations);
+
+    if (facts.privChange && facts.readded && level >= RAPID_READD_RULE_LEVEL
+        && facts.readdMinutes !== null && facts.readdMinutes <= RAPID_READD_MINUTES) {
+      return fromPattern('admin_group_rapid_readd', corroborations);
+    }
 
     // 2) 애매한 시도: 증거 하나만 있거나 되돌려진 변경
     if (facts.privChange && facts.readded) return fromPattern('admin_group_membership_reapplied');

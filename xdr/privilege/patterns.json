@@ -24,7 +24,7 @@
     "state": "none_provided",
     "note": "평소 관리자 명령 목록, 업무 시간, 권한 변경 승인 정보는 저장소와 운영 측 자료 어디에도 제공되지 않습니다. 그래서 임의의 기준을 만들어 정상과 비정상을 확정하지 않고, 경보 설명 문장이 스스로 밝힌 사실('처음 보는 주소', '원격 주소', '수업 시간 밖', '방금 관리자가 된', '다른 계정의 권한')만 보강 증거로 씁니다. 경보 시각에는 시간대(+09:00)가 있지만 업무 시간의 기준이 없어 시각만으로 야간 여부를 판단하지 않습니다."
   },
-  "input": "경보 한 건에서 네 가지를 봅니다. (1) 설명: rule.description을 마침표로 나눈 문장. '아닙니다'·'없습니다'·'취소됐습니다'로 끝나는 문장의 행위는 부정된 것으로 보고 행위로 세지 않습니다(관련 낱말만 주의 신호로 남음). (2) 그룹: data.group이 관리자 그룹인지(administrators 등). (3) 반복·다계정: data.count 또는 설명의 '계정 N개'. (4) 규칙 수준: rule.level. 이 판단은 경보 하나 안에 적힌 사실만 쓰며, 다른 경보와의 순서나 '그룹 추가 뒤 명령' 관계를 추측하지 않습니다. rule.mitre·data.srcuser·data.srcip는 읽지 않습니다.",
+  "input": "경보 한 건에서 네 가지를 봅니다. (1) 설명: rule.description을 마침표로 나눈 문장. '아닙니다'·'없습니다'·'취소됐습니다'로 끝나는 문장의 행위는 부정된 것으로 보고 행위로 세지 않습니다(관련 낱말만 주의 신호로 남음). (2) 그룹: data.group이 관리자 그룹인지(administrators 등). (3) 되돌림 간격: 설명의 'N분 뒤' 같은 표현(관리자 그룹에서 빠졌다가 다시 들어온 경우). (4) 반복·다계정: data.count 또는 설명의 '계정 N개'. (5) 규칙 수준: rule.level. 이 판단은 경보 하나 안에 적힌 사실만 쓰며, 다른 경보와의 순서나 '그룹 추가 뒤 명령' 관계를 추측하지 않습니다. rule.mitre·data.srcuser·data.srcip는 읽지 않습니다.",
   "patterns": [
     {
       "name": "admin_command_after_fresh_elevation",
@@ -76,10 +76,17 @@
       "reference": "T1098: 업무 시간 밖의 관리자 권한 부여는 정상 관리 작업과 구분되는 보강 증거입니다. 시각만으로는 판단하지 않고 설명이 밝힌 경우에만 씁니다."
     },
     {
+      "name": "admin_group_rapid_readd",
+      "signal": "admin_group_removed_then_readded_quickly",
+      "confidence": 0.86,
+      "condition": "관리자 그룹에서 빠진 구성원이 설명에 적힌 10분 이내 간격으로 다시 관리자로 들어왔고, 규칙 수준이 10 이상.",
+      "reference": "T1098: 관리자 그룹에서 빠진 구성원이 몇 분 안에 다시 들어오면 권한 회수를 되돌려 접근을 유지하려는 조작일 수 있습니다. 짧은 간격·관리자 그룹·높은 규칙 수준이 함께 있을 때만 block합니다."
+    },
+    {
       "name": "admin_group_membership_reapplied",
       "signal": "admin_group_removed_then_readded",
       "confidence": 0.65,
-      "condition": "관리자 그룹에서 빠진 계정이 짧은 간격으로 다시 들어옴. 다른 보강 증거는 없음.",
+      "condition": "관리자 그룹에서 빠진 구성원이 다시 들어왔지만 간격이 짧다고(10분 이내) 밝혀지지 않았거나 규칙 수준이 10 미만. 다른 보강 증거는 없음.",
       "reference": "T1098: 빠졌다가 다시 들어온 구성원은 실수 정정 같은 정상 관리 작업일 수도 있어 단독으로는 알림으로만 남깁니다."
     },
     {
@@ -98,9 +105,26 @@
     }
   ],
   "defaults": {
-    "no_known_privilege_pattern": { "confidence": 0.05, "reference": "알려진 권한 가로채기 패턴과 맞지 않는 사건입니다." },
-    "below_attention_level": { "confidence": 0.2, "reference": "권한 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다." }
+    "no_known_privilege_pattern": {
+      "confidence": 0.05,
+      "reference": "알려진 권한 가로채기 패턴과 맞지 않는 사건입니다."
+    },
+    "below_attention_level": {
+      "confidence": 0.2,
+      "reference": "권한 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    }
   },
-  "boosts": { "perCorroboration": 0.02, "cap": 0.99, "note": "block 패턴이 맞은 뒤 서로 다른 추가 보강 증거마다 확신도를 올립니다." },
-  "thresholds": { "block": 0.85, "alert": 0.5, "attentionRuleLevel": 5, "multiAccountCount": 3 }
+  "boosts": {
+    "perCorroboration": 0.02,
+    "cap": 0.99,
+    "note": "block 패턴이 맞은 뒤 서로 다른 추가 보강 증거마다 확신도를 올립니다."
+  },
+  "thresholds": {
+    "block": 0.85,
+    "alert": 0.5,
+    "attentionRuleLevel": 5,
+    "multiAccountCount": 3,
+    "rapidReaddMinutes": 10,
+    "rapidReaddRuleLevel": 10
+  }
 }

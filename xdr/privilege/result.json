@@ -52,9 +52,9 @@
     },
     {
       "alertId": "pv-09",
-      "action": "alert",
-      "confidence": 0.65,
-      "reason": "패턴 admin_group_membership_reapplied: T1098: 빠졌다가 다시 들어온 구성원은 실수 정정 같은 정상 관리 작업일 수도 있어 단독으로는 알림으로만 남깁니다."
+      "action": "block",
+      "confidence": 0.86,
+      "reason": "패턴 admin_group_rapid_readd: T1098: 관리자 그룹에서 빠진 구성원이 몇 분 안에 다시 들어오면 권한 회수를 되돌려 접근을 유지하려는 조작일 수 있습니다. 짧은 간격·관리자 그룹·높은 규칙 수준이 함께 있을 때만 block합니다."
     },
     {
       "alertId": "pv-10",
@@ -160,17 +160,17 @@
     }
   ],
   "counts": {
-    "block": 8,
-    "alert": 9,
+    "block": 9,
+    "alert": 8,
     "record": 9
   },
-  "generatedAt": "2026-10-14T02:38:53.245Z",
+  "generatedAt": "2026-10-14T02:47:01.150Z",
   "totalAlerts": 26,
   "readAlertsRows": 26,
   "loggedLinesThisRun": 26,
   "countsSum": 26,
   "patternsInSyncWithDecide": true,
-  "patternCount": 10,
+  "patternCount": 11,
   "labelsAvailable": true,
   "falsePositiveCount": 0,
   "falsePositiveAlertIds": [],
@@ -183,16 +183,16 @@
   "accountRevocation": {
     "state": "not_connected",
     "resolvedBlockCount": 0,
-    "unresolvedBlockCount": 8,
+    "unresolvedBlockCount": 9,
     "reason": "경보의 계정(srcuser)은 표시 이름이며 인증 시스템의 사용자 식별자와 연결된 자료가 없어 접근을 회수할 계정을 식별하지 못했습니다. 신원 회수 등록부·세션 폐기에는 쓰지 않았고, 기존 인증정보로 보호 API를 다시 호출하는 실제 검증은 연결이 없어 실행하지 않았습니다.",
     "sessionRevocationNote": "기간 한정 거부 규칙은 지속적인 인증 세션 폐기가 아닙니다. refresh token 폐기만으로 이미 발급된 access token이 즉시 무효화되지 않습니다."
   },
   "ruleChangesThisRun": {
     "created": 0,
     "extended": 0,
-    "unchanged": 8
+    "unchanged": 9
   },
-  "blockRuleCount": 7,
+  "blockRuleCount": 8,
   "blockRules": [
     {
       "sourceIp": "203.0.113.11",
@@ -242,6 +242,13 @@
       "expiresAt": "2026-10-14T03:38:52.489Z",
       "basisAlertIds": [
         "pv-08"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.27",
+      "expiresAt": "2026-10-14T03:46:22.081Z",
+      "basisAlertIds": [
+        "pv-09"
       ]
     }
   ],

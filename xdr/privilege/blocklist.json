@@ -62,5 +62,14 @@
       "pv-08"
     ],
     "createdAtMs": 1791945532489
+  },
+  {
+    "sourceIp": "198.51.100.27",
+    "expiresAtMs": 1791949582081,
+    "reason": "패턴 admin_group_rapid_readd: T1098: 관리자 그룹에서 빠진 구성원이 몇 분 안에 다시 들어오면 권한 회수를 되돌려 접근을 유지하려는 조작일 수 있습니다. 짧은 간격·관리자 그룹·높은 규칙 수준이 함께 있을 때만 block합니다.",
+    "basisAlertIds": [
+      "pv-09"
+    ],
+    "createdAtMs": 1791945982081
   }
 ]
