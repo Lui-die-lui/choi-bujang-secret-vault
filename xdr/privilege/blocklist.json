@@ -1,0 +1,66 @@
+[
+  {
+    "sourceIp": "203.0.113.11",
+    "expiresAtMs": 1791949132489,
+    "reason": "패턴 admin_group_add_unfamiliar_origin: T1098·T1078: 평소와 다른 출처에서 이뤄진 관리자 권한 부여는 가로챈 계정으로 한 조작일 수 있습니다.",
+    "basisAlertIds": [
+      "pv-01",
+      "pv-02"
+    ],
+    "createdAtMs": 1791945532489
+  },
+  {
+    "sourceIp": "198.51.100.11",
+    "expiresAtMs": 1791949132489,
+    "reason": "패턴 admin_command_unfamiliar_context: T1078: 평소와 다른 주소나 시간대에서의 관리자 명령은 정상 계정이 도용됐을 가능성을 보여 줍니다.",
+    "basisAlertIds": [
+      "pv-03"
+    ],
+    "createdAtMs": 1791945532489
+  },
+  {
+    "sourceIp": "192.0.2.11",
+    "expiresAtMs": 1791949132489,
+    "reason": "패턴 admin_command_after_fresh_elevation: T1078·T1098: 계정이 관리자 권한을 얻은 직후 관리자 명령을 실행하는 것은 가로챈 계정의 권한 상승 사용에 전형적인 연속 동작입니다.",
+    "basisAlertIds": [
+      "pv-04"
+    ],
+    "createdAtMs": 1791945532489
+  },
+  {
+    "sourceIp": "203.0.113.17",
+    "expiresAtMs": 1791949132489,
+    "reason": "패턴 admin_group_add_multiple_accounts: T1098: 한꺼번에 여러 계정을 관리자 그룹에 넣는 것은 개별 관리 작업이 아니라 권한 확대 시도에 가깝습니다.",
+    "basisAlertIds": [
+      "pv-05"
+    ],
+    "createdAtMs": 1791945532489
+  },
+  {
+    "sourceIp": "198.51.100.17",
+    "expiresAtMs": 1791949132489,
+    "reason": "패턴 admin_group_add_unfamiliar_origin: T1098·T1078: 평소와 다른 출처에서 이뤄진 관리자 권한 부여는 가로챈 계정으로 한 조작일 수 있습니다.",
+    "basisAlertIds": [
+      "pv-06"
+    ],
+    "createdAtMs": 1791945532489
+  },
+  {
+    "sourceIp": "192.0.2.17",
+    "expiresAtMs": 1791949132489,
+    "reason": "패턴 privilege_grant_followed_by_command: T1098·T1078: 같은 사건 안에서 권한 부여와 명령 실행이 이어지면 계정 조작 뒤 즉시 권한을 쓴 것입니다.",
+    "basisAlertIds": [
+      "pv-07"
+    ],
+    "createdAtMs": 1791945532489
+  },
+  {
+    "sourceIp": "203.0.113.27",
+    "expiresAtMs": 1791949132489,
+    "reason": "패턴 admin_command_other_account_privilege: T1078: 다른 계정의 권한으로 관리자 명령을 실행하는 것은 계정 자격 증명 도용·가장의 흔적입니다.",
+    "basisAlertIds": [
+      "pv-08"
+    ],
+    "createdAtMs": 1791945532489
+  }
+]

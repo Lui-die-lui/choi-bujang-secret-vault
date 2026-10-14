@@ -1,0 +1,249 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "privilege",
+  "decisions": [
+    {
+      "alertId": "pv-01",
+      "action": "block",
+      "confidence": 0.88,
+      "reason": "패턴 admin_group_add_unfamiliar_origin: T1098·T1078: 평소와 다른 출처에서 이뤄진 관리자 권한 부여는 가로챈 계정으로 한 조작일 수 있습니다."
+    },
+    {
+      "alertId": "pv-02",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "패턴 admin_command_after_fresh_elevation: T1078·T1098: 계정이 관리자 권한을 얻은 직후 관리자 명령을 실행하는 것은 가로챈 계정의 권한 상승 사용에 전형적인 연속 동작입니다."
+    },
+    {
+      "alertId": "pv-03",
+      "action": "block",
+      "confidence": 0.92,
+      "reason": "패턴 admin_command_unfamiliar_context: T1078: 평소와 다른 주소나 시간대에서의 관리자 명령은 정상 계정이 도용됐을 가능성을 보여 줍니다."
+    },
+    {
+      "alertId": "pv-04",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "패턴 admin_command_after_fresh_elevation: T1078·T1098: 계정이 관리자 권한을 얻은 직후 관리자 명령을 실행하는 것은 가로챈 계정의 권한 상승 사용에 전형적인 연속 동작입니다."
+    },
+    {
+      "alertId": "pv-05",
+      "action": "block",
+      "confidence": 0.89,
+      "reason": "패턴 admin_group_add_multiple_accounts: T1098: 한꺼번에 여러 계정을 관리자 그룹에 넣는 것은 개별 관리 작업이 아니라 권한 확대 시도에 가깝습니다."
+    },
+    {
+      "alertId": "pv-06",
+      "action": "block",
+      "confidence": 0.88,
+      "reason": "패턴 admin_group_add_unfamiliar_origin: T1098·T1078: 평소와 다른 출처에서 이뤄진 관리자 권한 부여는 가로챈 계정으로 한 조작일 수 있습니다."
+    },
+    {
+      "alertId": "pv-07",
+      "action": "block",
+      "confidence": 0.94,
+      "reason": "패턴 privilege_grant_followed_by_command: T1098·T1078: 같은 사건 안에서 권한 부여와 명령 실행이 이어지면 계정 조작 뒤 즉시 권한을 쓴 것입니다."
+    },
+    {
+      "alertId": "pv-08",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "패턴 admin_command_other_account_privilege: T1078: 다른 계정의 권한으로 관리자 명령을 실행하는 것은 계정 자격 증명 도용·가장의 흔적입니다."
+    },
+    {
+      "alertId": "pv-09",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "패턴 admin_group_membership_reapplied: T1098: 빠졌다가 다시 들어온 구성원은 실수 정정 같은 정상 관리 작업일 수도 있어 단독으로는 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-10",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 account_privilege_wording_attention: T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-11",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 account_privilege_wording_attention: T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-12",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 admin_privilege_event_single_signal: T1098·T1078: 관리자 권한 사건 하나만으로는 정상 관리 작업과 구분할 수 없어 사람이 볼 수 있게 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-13",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 account_privilege_wording_attention: T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-14",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 account_privilege_wording_attention: T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-15",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 account_privilege_wording_attention: T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-16",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 account_privilege_wording_attention: T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-17",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 account_privilege_wording_attention: T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "pv-18",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_privilege_pattern): 알려진 권한 가로채기 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "pv-19",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 권한 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "pv-20",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_privilege_pattern): 알려진 권한 가로채기 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "pv-21",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 권한 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "pv-22",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_privilege_pattern): 알려진 권한 가로채기 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "pv-23",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 권한 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "pv-24",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_privilege_pattern): 알려진 권한 가로채기 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "pv-25",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_privilege_pattern): 알려진 권한 가로채기 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "pv-26",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_privilege_pattern): 알려진 권한 가로채기 패턴과 맞지 않는 사건입니다."
+    }
+  ],
+  "counts": {
+    "block": 8,
+    "alert": 9,
+    "record": 9
+  },
+  "generatedAt": "2026-10-14T02:38:53.245Z",
+  "totalAlerts": 26,
+  "readAlertsRows": 26,
+  "loggedLinesThisRun": 26,
+  "countsSum": 26,
+  "patternsInSyncWithDecide": true,
+  "patternCount": 10,
+  "labelsAvailable": true,
+  "falsePositiveCount": 0,
+  "falsePositiveAlertIds": [],
+  "normalInDenyRuleCount": 0,
+  "normalInDenyRuleAlertIds": [],
+  "labelMismatchAlertIds": [],
+  "nonBlockBasisInRulesCount": 0,
+  "activeRuleCountAfterExpiry": 0,
+  "heldBackBlockAlertIds": [],
+  "accountRevocation": {
+    "state": "not_connected",
+    "resolvedBlockCount": 0,
+    "unresolvedBlockCount": 8,
+    "reason": "경보의 계정(srcuser)은 표시 이름이며 인증 시스템의 사용자 식별자와 연결된 자료가 없어 접근을 회수할 계정을 식별하지 못했습니다. 신원 회수 등록부·세션 폐기에는 쓰지 않았고, 기존 인증정보로 보호 API를 다시 호출하는 실제 검증은 연결이 없어 실행하지 않았습니다.",
+    "sessionRevocationNote": "기간 한정 거부 규칙은 지속적인 인증 세션 폐기가 아닙니다. refresh token 폐기만으로 이미 발급된 access token이 즉시 무효화되지 않습니다."
+  },
+  "ruleChangesThisRun": {
+    "created": 0,
+    "extended": 0,
+    "unchanged": 8
+  },
+  "blockRuleCount": 7,
+  "blockRules": [
+    {
+      "sourceIp": "203.0.113.11",
+      "expiresAt": "2026-10-14T03:38:52.489Z",
+      "basisAlertIds": [
+        "pv-01",
+        "pv-02"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.11",
+      "expiresAt": "2026-10-14T03:38:52.489Z",
+      "basisAlertIds": [
+        "pv-03"
+      ]
+    },
+    {
+      "sourceIp": "192.0.2.11",
+      "expiresAt": "2026-10-14T03:38:52.489Z",
+      "basisAlertIds": [
+        "pv-04"
+      ]
+    },
+    {
+      "sourceIp": "203.0.113.17",
+      "expiresAt": "2026-10-14T03:38:52.489Z",
+      "basisAlertIds": [
+        "pv-05"
+      ]
+    },
+    {
+      "sourceIp": "198.51.100.17",
+      "expiresAt": "2026-10-14T03:38:52.489Z",
+      "basisAlertIds": [
+        "pv-06"
+      ]
+    },
+    {
+      "sourceIp": "192.0.2.17",
+      "expiresAt": "2026-10-14T03:38:52.489Z",
+      "basisAlertIds": [
+        "pv-07"
+      ]
+    },
+    {
+      "sourceIp": "203.0.113.27",
+      "expiresAt": "2026-10-14T03:38:52.489Z",
+      "basisAlertIds": [
+        "pv-08"
+      ]
+    }
+  ],
+  "note": "운영 측 연습 경보 기준의 로컬 결과입니다. 정상 오차단은 직접 붙인 묶음 표시(privilege.expected.json, 심판의 정답표가 아님) 기준으로만 셉니다. 규칙은 xdr/privilege/blocklist.json에만 있고 학생 판정기(src/decider.mjs)나 실제 요청 처리 경로에는 연결되지 않았습니다(요청 계약에 출발 주소가 없음). 심판 판정 결과가 아닙니다."
+}

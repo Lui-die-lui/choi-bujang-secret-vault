@@ -1,0 +1,106 @@
+{
+  "_notice": "평범한 계정의 갑작스러운 권한 상승(관리자 그룹 추가·관리자 명령)의 알려진 형태를 정리한 목록입니다. decide.mjs는 심판의 격리 환경(import 없음) 때문에 이 패턴들을 파일 맨 위에 직접 옮겨 적어 둡니다 — 이 파일을 고치면 decide.mjs의 PATTERNS 상수도 같이 고쳐 주세요. 순서는 확신도 내림차순입니다. 기준 숫자(규칙 수준 5, 반복·다계정 3)와 낱말 목록·확신도는 운영 측 연습 경보(xdr/fixtures/privilege.json)의 모양을 읽고 직접 정한 가정이며 심판의 정답표에서 가져온 값이 아닙니다. 경보 ID·사용자 이름·출발 주소·rule.mitre·묶음 표시는 어떤 조건에도 쓰지 않습니다.",
+  "sources": [
+    {
+      "id": "mitre-t1098",
+      "title": "MITRE ATT&CK T1098 Account Manipulation",
+      "url": "https://attack.mitre.org/techniques/T1098/",
+      "checked": "2026-10-14에 공식 페이지 확인: 전술 Persistence·Privilege Escalation. 공격자가 기존 계정을 바꿔(자격 증명, 권한 그룹 등) 접근을 유지·확대하는 기법. 관리자 그룹 추가의 가장 가까운 근거이며, 일반 설명에는 '관리자 그룹 추가'가 명시되지 않고 하위 기법 T1098.007과 절차 예시에 나옴."
+    },
+    {
+      "id": "mitre-t1078",
+      "title": "MITRE ATT&CK T1078 Valid Accounts",
+      "url": "https://attack.mitre.org/techniques/T1078/",
+      "checked": "2026-10-14에 공식 페이지 확인: 전술 Initial Access·Persistence·Privilege Escalation(와 Stealth). 공격자가 정상 계정의 자격 증명을 가로채 접근하고 권한을 높이는 기법."
+    },
+    {
+      "id": "mitre-t1068",
+      "title": "MITRE ATT&CK T1068 Exploitation for Privilege Escalation",
+      "url": "https://attack.mitre.org/techniques/T1068/",
+      "checked": "2026-10-14에 공식 페이지 확인: 전술 Privilege Escalation. 소프트웨어·서비스·운영체제나 커널의 결함을 악용해 더 높은 권한으로 코드를 실행하는 기법. 취약점 악용 기법이므로 단순한 그룹 변경이나 관리자 명령만으로 T1068이라고 단정하지 않음(이 모듈은 이 번호를 판단 신호로 쓰지 않음)."
+    }
+  ],
+  "baseline": {
+    "state": "none_provided",
+    "note": "평소 관리자 명령 목록, 업무 시간, 권한 변경 승인 정보는 저장소와 운영 측 자료 어디에도 제공되지 않습니다. 그래서 임의의 기준을 만들어 정상과 비정상을 확정하지 않고, 경보 설명 문장이 스스로 밝힌 사실('처음 보는 주소', '원격 주소', '수업 시간 밖', '방금 관리자가 된', '다른 계정의 권한')만 보강 증거로 씁니다. 경보 시각에는 시간대(+09:00)가 있지만 업무 시간의 기준이 없어 시각만으로 야간 여부를 판단하지 않습니다."
+  },
+  "input": "경보 한 건에서 네 가지를 봅니다. (1) 설명: rule.description을 마침표로 나눈 문장. '아닙니다'·'없습니다'·'취소됐습니다'로 끝나는 문장의 행위는 부정된 것으로 보고 행위로 세지 않습니다(관련 낱말만 주의 신호로 남음). (2) 그룹: data.group이 관리자 그룹인지(administrators 등). (3) 반복·다계정: data.count 또는 설명의 '계정 N개'. (4) 규칙 수준: rule.level. 이 판단은 경보 하나 안에 적힌 사실만 쓰며, 다른 경보와의 순서나 '그룹 추가 뒤 명령' 관계를 추측하지 않습니다. rule.mitre·data.srcuser·data.srcip는 읽지 않습니다.",
+  "patterns": [
+    {
+      "name": "admin_command_after_fresh_elevation",
+      "signal": "admin_command_plus_fresh_elevation",
+      "confidence": 0.93,
+      "condition": "한 경보 설명이 관리자 명령 실행과 '방금'·'곧바로' 같은 권한 획득 직후임을 함께 밝힘.",
+      "reference": "T1078·T1098: 계정이 관리자 권한을 얻은 직후 관리자 명령을 실행하는 것은 가로챈 계정의 권한 상승 사용에 전형적인 연속 동작입니다."
+    },
+    {
+      "name": "privilege_grant_followed_by_command",
+      "signal": "admin_group_add_plus_command",
+      "confidence": 0.92,
+      "condition": "한 경보 설명이 관리자 권한 부여(관리자 그룹 추가·관리자 권한으로 변경)와 명령 실행을 함께 밝힘.",
+      "reference": "T1098·T1078: 같은 사건 안에서 권한 부여와 명령 실행이 이어지면 계정 조작 뒤 즉시 권한을 쓴 것입니다."
+    },
+    {
+      "name": "admin_command_unfamiliar_context",
+      "signal": "admin_command_plus_unfamiliar_or_off_hours",
+      "confidence": 0.9,
+      "condition": "관리자 명령 실행이면서 설명이 처음 보는·원격 주소이거나 업무 시간 밖임을 밝힘.",
+      "reference": "T1078: 평소와 다른 주소나 시간대에서의 관리자 명령은 정상 계정이 도용됐을 가능성을 보여 줍니다."
+    },
+    {
+      "name": "admin_command_other_account_privilege",
+      "signal": "admin_command_with_other_account_privilege",
+      "confidence": 0.9,
+      "condition": "관리자 명령 실행이면서 설명이 다른 계정의 권한으로 실행했다고 밝힘.",
+      "reference": "T1078: 다른 계정의 권한으로 관리자 명령을 실행하는 것은 계정 자격 증명 도용·가장의 흔적입니다."
+    },
+    {
+      "name": "admin_group_add_multiple_accounts",
+      "signal": "admin_group_add_plus_multiple_accounts",
+      "confidence": 0.89,
+      "condition": "관리자 그룹 추가이면서 같은 경보에서 계정이 3개 이상이거나 반복 횟수가 3 이상.",
+      "reference": "T1098: 한꺼번에 여러 계정을 관리자 그룹에 넣는 것은 개별 관리 작업이 아니라 권한 확대 시도에 가깝습니다."
+    },
+    {
+      "name": "admin_group_add_unfamiliar_origin",
+      "signal": "admin_group_add_plus_unfamiliar_origin",
+      "confidence": 0.88,
+      "condition": "관리자 그룹 추가·관리자 권한 변경이면서 설명이 처음 보는 주소나 원격 주소임을 밝힘.",
+      "reference": "T1098·T1078: 평소와 다른 출처에서 이뤄진 관리자 권한 부여는 가로챈 계정으로 한 조작일 수 있습니다."
+    },
+    {
+      "name": "admin_group_add_off_hours",
+      "signal": "admin_group_add_plus_off_hours",
+      "confidence": 0.87,
+      "condition": "관리자 그룹 추가·관리자 권한 변경이면서 설명이 업무 시간 밖(수업 시간 밖·업무처럼 보이지 않는 시각)임을 밝힘.",
+      "reference": "T1098: 업무 시간 밖의 관리자 권한 부여는 정상 관리 작업과 구분되는 보강 증거입니다. 시각만으로는 판단하지 않고 설명이 밝힌 경우에만 씁니다."
+    },
+    {
+      "name": "admin_group_membership_reapplied",
+      "signal": "admin_group_removed_then_readded",
+      "confidence": 0.65,
+      "condition": "관리자 그룹에서 빠진 계정이 짧은 간격으로 다시 들어옴. 다른 보강 증거는 없음.",
+      "reference": "T1098: 빠졌다가 다시 들어온 구성원은 실수 정정 같은 정상 관리 작업일 수도 있어 단독으로는 알림으로만 남깁니다."
+    },
+    {
+      "name": "admin_privilege_event_single_signal",
+      "signal": "admin_privilege_event_without_context",
+      "confidence": 0.6,
+      "condition": "규칙 수준이 5 이상이고 관리자 권한 부여 또는 관리자 명령 실행이 확인되지만 처음 보는 주소·업무 시간 밖·직후 실행·다계정 같은 보강 증거는 없음.",
+      "reference": "T1098·T1078: 관리자 권한 사건 하나만으로는 정상 관리 작업과 구분할 수 없어 사람이 볼 수 있게 알림으로만 남깁니다."
+    },
+    {
+      "name": "account_privilege_wording_attention",
+      "signal": "account_wording_attention_level",
+      "confidence": 0.5,
+      "condition": "규칙 수준이 5 이상이고 설명에 계정·그룹·권한·관리자 낱말이 있지만 권한 부여나 명령 실행은 확인되지 않음(부정된 행위 포함).",
+      "reference": "T1098: 권한 관련 사건이지만 실제 권한 상승이 확인되지 않아 알림으로만 남깁니다."
+    }
+  ],
+  "defaults": {
+    "no_known_privilege_pattern": { "confidence": 0.05, "reference": "알려진 권한 가로채기 패턴과 맞지 않는 사건입니다." },
+    "below_attention_level": { "confidence": 0.2, "reference": "권한 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다." }
+  },
+  "boosts": { "perCorroboration": 0.02, "cap": 0.99, "note": "block 패턴이 맞은 뒤 서로 다른 추가 보강 증거마다 확신도를 올립니다." },
+  "thresholds": { "block": 0.85, "alert": 0.5, "attentionRuleLevel": 5, "multiAccountCount": 3 }
+}
