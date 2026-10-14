@@ -60,7 +60,7 @@
 <body>
   <main>
     <div id="offline-notice" role="status" hidden>지금 오프라인입니다. 이 앱은 자료를 기기에 저장하지 않으므로, 연결이 돌아올 때까지 로그인·기기 확인·자료 보기를 할 수 없습니다.</div>
-    <div class="eyebrow">BYTE BACK · 11단계 나만의 접속 앱</div>
+    <div class="eyebrow">BYTE BACK · 12단계 탈환 작전실</div>
     <h1>BYTE BACK 자료실</h1>
     <p>아래 기록은 모두 실습을 위해 만든 가상 자료입니다. 자료는 서버가 로그인과 이 기기의 등록 여부를 확인한 뒤에만 열립니다.</p>
     <div class="notice">이 화면을 홈 화면에 설치해도 기기 확인이 끝난 것은 아닙니다. 설치 여부와 관계없이 로그인하고, 서버에 등록·승인된 기기임을 확인받아야 자료가 보입니다.</div>
@@ -91,6 +91,15 @@
         <button type="button" id="device-check" hidden>승인 상태 다시 확인</button>
       </div>
       <p class="auth-error" id="device-error" role="alert"></p>
+    </div>
+
+    <div class="device" id="ops-panel" hidden>
+      <h2>탈환 작전실</h2>
+      <p>본인 계정의 판정·탐지·회수·복구 기록만 서버에서 읽어 보여 줍니다. 값이 없거나 조회에 실패하면 그대로 적으며, 0건과 미실행을 바꿔 표시하지 않습니다. 메모 본문은 표시하지 않습니다.</p>
+      <div class="device-actions"><button type="button" id="ops-refresh">작전실 새로고침</button></div>
+      <p id="ops-meta" aria-live="polite"></p>
+      <ul id="ops-list"></ul>
+      <p class="auth-error" id="ops-error" role="alert"></p>
     </div>
 
     <ul id="notes" aria-live="polite"></ul>
@@ -161,6 +170,8 @@
       list.replaceChildren();
       myNotesList.replaceChildren();
       myNotesSection.hidden = true;
+      opsPanel.hidden = true;
+      opsList.replaceChildren();
       if (session) showDevice({ message, canCheck: true, canRequest: true });
     }
 
@@ -308,6 +319,72 @@
       await loadMyNotes();
     });
 
+
+    // ---- 12단계: 탈환 작전실 (서버가 돌려준 값만 표시) ----
+    const opsPanel = document.getElementById('ops-panel');
+    const opsList = document.getElementById('ops-list');
+    const opsMeta = document.getElementById('ops-meta');
+    const opsError = document.getElementById('ops-error');
+    const STATE_LABEL = {
+      defined_in_code: '코드에 정의된 값(실행 결과 아님)', observed: '서버 조회 결과', no_events: '조회됨 · 기록 0건',
+      query_failed: '조회 실패', not_connected: '연결되지 않음',
+    };
+    const stateText = value => STATE_LABEL[value] ?? `알 수 없음(${String(value)})`;
+    function opsRow(title, state, detail) {
+      const item = document.createElement('li');
+      const head = document.createElement('strong');
+      head.textContent = `${title} — ${stateText(state)}`;
+      const body = document.createElement('span');
+      body.textContent = detail;
+      item.append(head, body);
+      return item;
+    }
+    function renderOps(data) {
+      const d = data.detection ?? {};
+      const dev = data.devices ?? {};
+      const idt = data.identity ?? {};
+      const rec = data.recovery ?? {};
+      const rules = data.rules ?? {};
+      opsMeta.textContent = `요청 ID ${data.requestId ?? '없음'} · 범위 ${data.scope} · ${data.generatedAt}`;
+      const countsText = counts => (counts ? Object.entries(counts).map(([k, v]) => `${k} ${v}건`).join(', ') || '기록 0건' : '값 없음');
+      opsList.replaceChildren(
+        opsRow('판정기 규칙', rules.state, `규칙 이름 ${Array.isArray(rules.ruleIds) ? rules.ruleIds.join(', ') : '값 없음'} · 최근 관문 결과: ${countsText(rules.observedGateOutcomes)}`),
+        opsRow('탐지 사건', d.state, d.state === 'query_failed'
+          ? `읽지 못했습니다(${d.reason ?? '원인 없음'})`
+          : `최근 ${Math.round((d.windowSeconds ?? 0) / 60)}분 사건 ${d.eventCount ?? '값 없음'}건 · 탐지 결과 ${d.result?.action ?? '값 없음'} · 운영 엔진 전달 ${stateText(d.engineDelivery)}`),
+        opsRow('신원 회수', idt.state, idt.state === 'observed'
+          ? `현재 ${idt.current} · 회수 이력 ${idt.history?.length ?? 0}건`
+          : `읽지 못했습니다(${idt.reason ?? '원인 없음'})`),
+        opsRow('기기 회수 상태', dev.state, dev.state === 'observed'
+          ? `승인 ${dev.counts?.approved ?? 0} · 대기 ${dev.counts?.pending ?? 0} · 회수 ${dev.counts?.revoked ?? 0}`
+          : `읽지 못했습니다(${dev.reason ?? '원인 없음'})`),
+        opsRow('복구 버전·결과', rec.state, rec.state === 'observed'
+          ? `사본 ${rec.backups?.length ?? 0}건 · 복원 시도 기록 ${rec.restoreAudit?.length ?? 0}건`
+            + (rec.restoreAudit?.length ? ` · 최근 결과 ${rec.restoreAudit[0].outcome}` : '')
+          : `읽지 못했습니다(${rec.reason ?? '원인 없음'})`),
+      );
+    }
+    async function loadOps() {
+      opsError.textContent = '';
+      if (!opened()) {
+        opsPanel.hidden = true;
+        opsList.replaceChildren();
+        return;
+      }
+      opsPanel.hidden = false;
+      try {
+        const response = await fetch('/api/ops/summary', { cache: 'no-store', headers: authHeaders() });
+        if (response.status === 403) return closeVault('기기 확인이 끝났거나 승인이 거두어졌습니다. 승인 상태를 다시 확인해 주세요.');
+        if (!response.ok) throw new Error(`작전실 조회 실패(HTTP ${response.status})`);
+        renderOps(await response.json());
+      } catch (error) {
+        opsList.replaceChildren();
+        opsMeta.textContent = '';
+        opsError.textContent = error.message;
+      }
+    }
+    document.getElementById('ops-refresh').addEventListener('click', loadOps);
+
     // ---- 11단계: 기기 승인 화면 ----
     const b64u = buffer => btoa(String.fromCharCode(...new Uint8Array(buffer)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -426,6 +503,7 @@
           renderSession();
           await loadNotes();
           await loadMyNotes();
+          await loadOps();
         } else if (data.status === 'pending') {
           showDevice({ message: '승인 대기 중입니다. 관리자가 등록부에서 승인하기 전에는 자료가 열리지 않습니다.', code: data.code, canCheck: true });
         } else {
@@ -464,6 +542,7 @@
       renderSession();
       loadNotes();
       loadMyNotes();
+      loadOps();
       showDeviceState();
     }
 

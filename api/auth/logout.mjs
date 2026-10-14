@@ -1,3 +1,4 @@
+import { traceRequest } from '../../src/request-trace.mjs';
 import { createClient } from '@supabase/supabase-js';
 
 // 공식 SDK의 auth.admin.signOut만 사용합니다(서버가 service_role 키로
@@ -13,6 +14,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'method_not_allowed' });
   }
   response.setHeader('Cache-Control', 'no-store');
+  traceRequest(request, response);
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { describeAuthorization } from '../src/auth-diagnostics.mjs';
 import { requireRegisteredDevice } from '../src/device-registry.mjs';
 import { verifyRequestLogin } from '../src/notes-auth.mjs';
+import { traceRequest } from '../src/request-trace.mjs';
 
 // 2단계: 가상 메모를 코드 밖(Supabase, t02_vault_notes)으로 옮기고
 // 서버 전용 환경변수로만 읽습니다.
@@ -14,6 +15,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'method_not_allowed' });
   }
   response.setHeader('Cache-Control', 'no-store');
+  traceRequest(request, response);
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;

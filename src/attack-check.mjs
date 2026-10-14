@@ -26,7 +26,7 @@ export async function runAttackChecks(config) {
   // 11단계: 기기 승인 등록부 경로(GET /api/device/challenge)는 비로그인 거부만 실제 HTTP로
   // 점검합니다. 로그인한 요청의 기기 확인(승인 전 403, 승인 뒤 정상)은 이 점검에 계정 토큰과
   // 기기의 인증 장치가 없어 미실행입니다(npm run test:device 인메모리 대역으로만 확인).
-  if (![5, 6, 7, 8, 9, 10, 11].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![5, 6, 7, 8, 9, 10, 11, 12].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -72,6 +72,10 @@ export async function runAttackChecks(config) {
   // 10단계: 실제 자료가 아닌 고정 가상 ID로 비로그인 복원 요청을 보냅니다.
   const restoreCheck = config.step >= 10 ? await checkAnonymousRejected(
     '/api/note-restore/00000000-0000-4000-8000-000000000000', 'POST') : null;
+  // 12단계: 탈환 작전실 API도 비로그인 거부만 실제 HTTP로 점검합니다. 로그인·승인 기기로 보내는
+  // 시험(회수된 신원, 복구 뒤 변경 요청 등)은 계정·패스키가 필요해 npm run ops:verify와
+  // docs/OPS_VERIFY.md의 수동 절차로 따로 기록하며, 이 점검에는 넣지 않습니다(미실행).
+  const opsCheck = config.step >= 12 ? await checkAnonymousRejected('/api/ops/summary') : null;
   const deviceCheck = config.step >= 11 ? await checkAnonymousRejected('/api/device/challenge') : null;
 
   // 5단계: 원본 Supabase 자료 API(aleph.config.json의 originalApiUrl)를
@@ -140,6 +144,14 @@ export async function runAttackChecks(config) {
       observed: deviceCheck.rejected && deviceCheck.isJson
         ? `비로그인 기기 등록부 요청이 거부됨 (HTTP ${deviceCheck.status}, JSON 응답)`
         : `비로그인 기기 등록부 요청이 기대대로 거부되지 않음 (HTTP ${deviceCheck.status}, JSON 응답 ${deviceCheck.isJson})`,
+    }] : []),
+    ...(opsCheck ? [{
+      attackId: 'anonymous_ops_summary_denied',
+      expected: '비로그인 GET /api/ops/summary는 401 또는 403과 JSON 오류로 거부되어야 함',
+      observed: opsCheck.rejected && opsCheck.isJson
+        ? `비로그인 작전실 요청이 거부됨 (HTTP ${opsCheck.status}, JSON 응답)`
+        : `비로그인 작전실 요청이 기대대로 거부되지 않음 (HTTP ${opsCheck.status}, JSON 응답 ${opsCheck.isJson})`
+          + (opsCheck.status === 404 ? ' — 배포본에 이 경로가 아직 없습니다(이번 변경 미배포)' : ''),
     }] : []),
     {
       attackId: 'anon_direct_original_api_read_denied',

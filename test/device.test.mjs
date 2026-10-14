@@ -10,7 +10,9 @@ const B = '22222222-2222-4222-8222-222222222222';
 const NOTE_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 // ---- 인메모리 저장소와 로그인 대역 ----
-const tables = { t11_devices: [], t03_personal_notes: [], t02_vault_notes: [], t10_note_backups: [] };
+const failing = new Set(); // 이 표를 조회하면 오류를 돌려줌(조회 실패 시험)
+const tables = { t11_devices: [], t03_personal_notes: [], t02_vault_notes: [], t10_note_backups: [],
+  t12_revoked_identities: [], t12_access_events: [], t10_restore_audit: [] };
 function query(table) {
   assert.ok(table in tables, table);
   const filters = [];
@@ -18,6 +20,7 @@ function query(table) {
   let patch;
   const run = single => {
     const source = tables[table];
+    if (failing.has(table)) return { data: null, error: { message: 'injected failure' } };
     if (op === 'insert') {
       if (table === 't11_devices' && source.some(r => r.credential_id === patch.credential_id)) {
         return { data: null, error: { message: 'duplicate key' } };
@@ -25,7 +28,7 @@ function query(table) {
       source.push({ ...patch });
       return { data: single ? { ...patch } : [{ ...patch }], error: null };
     }
-    const hit = source.filter(r => filters.every(([k, v]) => r[k] === v));
+    const hit = source.filter(r => filters.every(([k, v]) => r[k] === v || (v === null && r[k] === undefined)));
     return { data: single ? (hit[0] ? { ...hit[0] } : null) : hit.map(r => ({ ...r })), error: null };
   };
   const builder = {
@@ -34,6 +37,8 @@ function query(table) {
     eq: (k, v) => { filters.push([k, v]); return builder; },
     is: (k, v) => { filters.push([k, v]); return builder; },
     order: () => builder,
+    gte: () => builder,
+    limit: () => builder,
     single: async () => run(true),
     maybeSingle: async () => run(true),
     then: (resolve, reject) => Promise.resolve(run(false)).then(resolve, reject),
@@ -64,6 +69,7 @@ const { default: listApi } = await import('../api/my-notes/index.mjs');
 const { default: itemApi } = await import('../api/my-notes/[id].mjs');
 const { default: sharedApi } = await import('../api/notes.mjs');
 const { default: restoreApi } = await import('../api/note-restore/[id].mjs');
+const { default: summaryApi } = await import('../api/ops/summary.mjs');
 const { relyingParty, issueDeviceSession } = await import('../src/device-registry.mjs');
 
 function call(handler, { method = 'GET', token, deviceSession, query: q = {}, body } = {}) {
@@ -71,9 +77,9 @@ function call(handler, { method = 'GET', token, deviceSession, query: q = {}, bo
   if (token) headers.authorization = `Bearer ${token}`;
   if (deviceSession) headers['x-device-session'] = deviceSession;
   const request = { method, headers, query: q, body };
-  const out = { status: null, body: undefined };
+  const out = { status: null, body: undefined, headers: {} };
   const response = {
-    setHeader: () => {},
+    setHeader: (name, value) => { out.headers[name.toLowerCase()] = value; },
     status(code) { out.status = code; return response; },
     json(payload) { out.body = payload; return response; },
     end() { return response; },
@@ -113,6 +119,10 @@ function reset() {
   tables.t03_personal_notes = [{ id: NOTE_A, owner_id: A, title: 'A 제목', content: 'A 본문', created_at: 1 }];
   tables.t02_vault_notes = [{ id: 1, owner_id: null, title: '공용 제목', content: '공용 본문' }];
   tables.t10_note_backups = [];
+  tables.t12_revoked_identities = [];
+  tables.t12_access_events = [];
+  tables.t10_restore_audit = [];
+  failing.clear();
 }
 const dataRequests = (extra = {}) => [
   [sharedApi, { token: 'token-a', ...extra }],
@@ -128,7 +138,8 @@ const dataRequests = (extra = {}) => [
 test('승인 전: 기기 확인 없이 보낸 보호 요청은 자료 없이 403이고 저장 내용도 그대로다', async () => {
   reset();
   const logs = quiet();
-  const snapshot = JSON.stringify(tables);
+  const stored = () => JSON.stringify({ ...tables, t12_access_events: undefined }); // 접근 사건 기록(12단계)은 자료가 아니라 관측 기록
+  const snapshot = stored();
   for (const [handler, options] of dataRequests()) {
     const out = await call(handler, options);
     assert.equal(out.status, 403, `${options.method ?? 'GET'}`);
@@ -137,7 +148,8 @@ test('승인 전: 기기 확인 없이 보낸 보호 요청은 자료 없이 403
   // 심판 신원 토큰도 같은 규칙이고, 비로그인은 전과 같이 401이다
   assert.equal((await call(listApi, { token: 'token-judge-a' })).status, 403);
   assert.equal((await call(listApi, {})).status, 401);
-  assert.equal(JSON.stringify(tables), snapshot);
+  assert.equal(stored(), snapshot);
+  assert.ok(tables.t12_access_events.length > 0 && tables.t12_access_events.every(e => e.outcome === 'device_not_registered' && e.request_id));
   assert.doesNotMatch(logs.text(), /A 본문|공용 본문|token-a/u);
   logs.done();
 });
@@ -264,5 +276,120 @@ test('승인 요청 거부: 비로그인, 틀린 종류의 서명 자료, 틀린
   assert.equal((await call(requestApi, { method: 'POST', token: 'token-a', body })).status, 409);
   assert.equal(tables.t11_devices.length, 1);
   assert.equal((await call(requestApi, { method: 'GET', token: 'token-a' })).status, 405);
+  logs.done();
+});
+
+// ---- 12단계: 신원 회수, 요청 ID, 탈환 작전실 (인메모리 대역. 실제 배포 API·심판 판정이 아님) ----
+async function approvedSession(token = 'token-a', userId = A) {
+  const device = authenticator(b64u(Buffer.from(`fixture-credential-${userId.slice(0, 4)}`)));
+  const first = await challengeFor(token);
+  await call(requestApi, { method: 'POST', token, body: device.create(first.challenge, first.challengeToken) });
+  tables.t11_devices.find(r => r.credential_id === device.credentialId).status = 'approved';
+  const next = await challengeFor(token);
+  const checked = await call(verifyApi, { method: 'POST', token,
+    body: device.get(next.challenge, next.challengeToken) });
+  assert.equal(checked.body.status, 'approved');
+  return checked.body.deviceSession;
+}
+
+test('회수된 신원: 같은 로그인·승인 기기·기기 확인 결과로도 모든 보호·기기 경로가 닫히고, 다른 정상 사용자는 열린다', async () => {
+  reset();
+  const logs = quiet();
+  const sessionA = await approvedSession('token-a', A);
+  const sessionB = await approvedSession('token-b', B);
+  // 회수 전: 정상 허용
+  assert.equal((await call(listApi, { token: 'token-a', deviceSession: sessionA })).status, 200);
+  assert.equal((await call(sharedApi, { token: 'token-b', deviceSession: sessionB })).status, 200);
+
+  tables.t12_revoked_identities.push({ subject_id: A, reason_code: 'operator_revoke', restored_at: null }); // 관리자가 DB에서 회수
+  for (const [handler, options] of dataRequests({ deviceSession: sessionA })) {
+    const out = await call(handler, options);
+    assert.deepEqual([out.status, out.body], [403, { error: 'identity_revoked' }]);
+  }
+  assert.equal((await call(challengeApi, { token: 'token-a' })).status, 403);
+  assert.equal((await call(verifyApi, { method: 'POST', token: 'token-a', body: { credentialId: 'x'.repeat(20) } })).status, 403);
+  assert.equal((await call(summaryApi, { token: 'token-a', deviceSession: sessionA })).status, 403);
+  // 회수 대상이 아닌 B의 정상 요청은 그대로 허용
+  assert.equal((await call(listApi, { token: 'token-b', deviceSession: sessionB })).status, 200);
+  assert.equal((await call(sharedApi, { token: 'token-b', deviceSession: sessionB })).status, 200);
+  // 비로그인은 여전히 401
+  assert.equal((await call(listApi, {})).status, 401);
+
+  // 복권(restored_at)하면 같은 계정이 다시 열린다 — 이전 거부가 영구 상태가 아님을 확인
+  tables.t12_revoked_identities[0].restored_at = '2026-10-14T00:00:00Z';
+  assert.equal((await call(listApi, { token: 'token-a', deviceSession: sessionA })).status, 200);
+  assert.doesNotMatch(logs.text(), /token-a|A 본문/u);
+  logs.done();
+});
+
+test('회수 등록부를 읽지 못하면 열어 주지 않는다(fail-closed)', async () => {
+  reset();
+  const logs = quiet();
+  const session = await approvedSession('token-a', A);
+  failing.add('t12_revoked_identities');
+  const out = await call(listApi, { token: 'token-a', deviceSession: session });
+  assert.deepEqual([out.status, out.body], [503, { error: 'revocation_registry_unavailable' }]);
+  failing.clear();
+  assert.equal((await call(listApi, { token: 'token-a', deviceSession: session })).status, 200);
+  logs.done();
+});
+
+test('요청 ID: 응답마다 서버가 새로 만든 값이 붙고, 접근 사건에 같은 값이 남으며, 본문·토큰은 사건에 없다', async () => {
+  reset();
+  const logs = quiet();
+  const session = await approvedSession('token-a', A);
+  tables.t12_access_events = [];
+  const one = await call(listApi, { token: 'token-a', deviceSession: session });
+  const two = await call(listApi, { token: 'token-a', deviceSession: session });
+  assert.match(one.headers['x-request-id'], /^[0-9a-f-]{36}$/u);
+  assert.notEqual(one.headers['x-request-id'], two.headers['x-request-id']);
+  assert.deepEqual(tables.t12_access_events.map(e => e.request_id),
+    [one.headers['x-request-id'], two.headers['x-request-id']]);
+  const text = JSON.stringify(tables.t12_access_events);
+  assert.doesNotMatch(text, /A 본문|A 제목|token-a|Bearer/u);
+  logs.done();
+});
+
+test('탈환 작전실: 본인 범위만, 인증·기기·회수 관문을 거치고, 값의 출처 구분과 민감값 제외', async () => {
+  reset();
+  const logs = quiet();
+  assert.equal((await call(summaryApi, {})).status, 401);
+  assert.equal((await call(summaryApi, { token: 'token-a' })).status, 403); // 승인 기기 없음
+  const sessionA = await approvedSession('token-a', A);
+  const sessionB = await approvedSession('token-b', B);
+  assert.equal((await call(summaryApi, { method: 'POST', token: 'token-a', deviceSession: sessionA })).status, 405);
+  // 본인 사건 121건(GET)을 10분 안에 넣어 탐지 결과를 확인(회수는 집행되지 않음)
+  const subject = (await (async () => {
+    await call(listApi, { token: 'token-a', deviceSession: sessionA });
+    return tables.t12_access_events.at(-1).subject_hash;
+  })());
+  for (let i = 0; i < 121; i += 1) {
+    tables.t12_access_events.push({ at: new Date().toISOString(), subject_hash: subject,
+      method: 'GET', route: '/api/notes', outcome: 'allowed', status: 200, request_id: `fixture-${i}` });
+  }
+  tables.t10_restore_audit.push({ at: '2026-10-13T00:00:00Z', note_id: NOTE_A, owner_id: A, outcome: 'restored', reason: null },
+    { at: '2026-10-13T00:00:00Z', note_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', owner_id: B, outcome: 'restored', reason: null });
+  const out = await call(summaryApi, { token: 'token-a', deviceSession: sessionA });
+  assert.equal(out.status, 200);
+  assert.equal(out.body.scope, 'self');
+  assert.equal(out.body.requestId, out.headers['x-request-id']);
+  assert.equal(out.body.rules.state, 'defined_in_code');
+  assert.ok(out.body.rules.ruleIds.includes('device_registered'));
+  assert.equal(out.body.detection.state, 'observed', JSON.stringify(out.body.detection));
+  assert.equal(out.body.detection.result.action, 'propose_revocation');
+  assert.equal(out.body.detection.engineDelivery, 'not_connected');
+  assert.equal(out.body.identity.current, 'active'); // 제안만 있고 회수는 집행되지 않음
+  assert.deepEqual(out.body.devices.counts, { pending: 0, approved: 1, revoked: 0 });
+  assert.equal(out.body.recovery.restoreAudit.length, 1); // B의 복원 기록은 보이지 않음
+  const text = JSON.stringify(out.body);
+  assert.doesNotMatch(text, /A 본문|A 제목|공용 본문|token-a|Bearer|public_key|credential_id|fixture-credential|test-only-not-a-real-key/u);
+  assert.doesNotMatch(text, new RegExp(A, 'u'));
+
+  // 조회 실패는 0건이 아니라 query_failed로 표시한다
+  failing.add('t10_note_backups');
+  const failed = await call(summaryApi, { token: 'token-b', deviceSession: sessionB });
+  assert.equal(failed.status, 200);
+  assert.equal(failed.body.recovery.state, 'query_failed');
+  assert.equal(failed.body.devices.state, 'observed'); // 기기 등록부가 안 읽히면 관문이 먼저 403으로 닫는다
   logs.done();
 });

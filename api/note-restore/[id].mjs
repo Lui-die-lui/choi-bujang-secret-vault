@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireRegisteredDevice } from '../../src/device-registry.mjs';
 import { BACKUP_TABLE, contentHash, verifyBackup } from '../../src/note-backup.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
+import { traceRequest } from '../../src/request-trace.mjs';
 
 const TABLE = 't03_personal_notes';
 const AUDIT_TABLE = 't10_restore_audit';
@@ -82,6 +83,7 @@ async function appendAudit(supabase, row) {
 // 제목·본문·토큰을 넣지 않습니다.
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
+  traceRequest(request, response);
 
   const { id } = request.query;
   if (typeof id !== 'string' || !UUID.test(id)) {

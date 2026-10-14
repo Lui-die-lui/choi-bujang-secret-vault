@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { describeAuthorization } from '../../src/auth-diagnostics.mjs';
 import { requireRegisteredDevice } from '../../src/device-registry.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
+import { traceRequest } from '../../src/request-trace.mjs';
 
 const TABLE = 't03_personal_notes';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -41,6 +42,7 @@ function logRead(fields) {
 // 애초에 읽지 않으므로 소유자 변경 자체가 불가능합니다.
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
+  traceRequest(request, response);
 
   const { id } = request.query;
   if (typeof id !== 'string' || !UUID.test(id)) {

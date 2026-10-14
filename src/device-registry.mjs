@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decide } from './decider.mjs';
+import { recordAccess, requireActiveIdentity } from './ops-registry.mjs';
 
 // 11단계: 기기 승인 등록부와 기기 확인의 공통 규칙입니다.
 //  - 기기 키는 브라우저 저장소가 아니라 기기의 인증 장치(패스키, WebAuthn) 안에 있습니다.
@@ -149,7 +150,20 @@ function deviceDecisionRequest({ userId, credentialId, registered }) {
 // 자료 API 공통 관문: 로그인 확인 뒤, 자료를 조회하기 전에 부릅니다.
 // 기기 확인 결과(헤더)가 없거나, 다른 사용자의 것이거나, 만료됐거나, 등록부에서 승인 상태가
 // 아니면 판정기가 거부하고 403을 돌려줍니다. 심판·학생 구분 없이 같은 규칙입니다.
+// 12단계: 같은 관문이 (1) 회수된 신원을 먼저 닫고, (2) 결과를 접근 사건으로 기록합니다.
+// 사건에는 경로 모양·결과·상태·요청 ID만 남고 본문·토큰·쿼리는 남지 않습니다.
+const UUID_IN_PATH = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
+const routeShape = request => String(request.url ?? '').split('?')[0].replace(UUID_IN_PATH, ':id').slice(0, 80);
+
 export async function requireRegisteredDevice({ request, identity, supabase, secret, now = nowSeconds() }) {
+  const route = routeShape(request);
+  const finish = async (result, outcome) => {
+    await recordAccess({ supabase, identity, request, route, outcome, status: result.ok ? 200 : result.status });
+    return result;
+  };
+  const active = await requireActiveIdentity({ supabase, identity });
+  if (!active.ok) return finish(active, 'identity_revoked');
+
   const session = unseal(secret, 'session', request.headers?.[DEVICE_SESSION_HEADER], now);
   let registered = false;
   let credentialId = null;
@@ -164,7 +178,7 @@ export async function requireRegisteredDevice({ request, identity, supabase, sec
     }
   }
   const verdict = await decide(deviceDecisionRequest({ userId: identity.userId, credentialId, registered }));
-  if (verdict.decision === 'allow') return { ok: true };
+  if (verdict.decision === 'allow') return finish({ ok: true }, 'allowed');
   console.warn(`device gate denied: reason=${verdict.reasonCode} device=${credentialId ? deviceCode(credentialId) : 'none'}`);
-  return { ok: false, status: 403, body: { error: 'device_not_registered' } };
+  return finish({ ok: false, status: 403, body: { error: 'device_not_registered' } }, 'device_not_registered');
 }

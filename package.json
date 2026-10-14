@@ -16,6 +16,8 @@
     "test:restore": "node --experimental-test-module-mocks --test test/restore.test.mjs",
     "test:policy": "node --test test/policy-restore.test.mjs",
     "test:device": "node --experimental-test-module-mocks --test test/device.test.mjs",
+    "ops:verify": "node --env-file-if-exists=.env scripts/ops-verify.mjs",
+    "ops:serve": "node --env-file-if-exists=.env scripts/local-server-run.mjs",
     "xdr:run": "node xdr/run.mjs",
     "xdr:sync": "node xdr/sync.mjs"
   },

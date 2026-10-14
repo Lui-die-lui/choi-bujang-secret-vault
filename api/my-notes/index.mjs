@@ -3,6 +3,7 @@ import { describeAuthorization } from '../../src/auth-diagnostics.mjs';
 import { requireRegisteredDevice } from '../../src/device-registry.mjs';
 import { BACKUP_TABLE, backupRow } from '../../src/note-backup.mjs';
 import { verifyRequestLogin } from '../../src/notes-auth.mjs';
+import { traceRequest } from '../../src/request-trace.mjs';
 
 const TABLE = 't03_personal_notes';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -15,6 +16,7 @@ function serialize(row) {
 // 서버가 검증한 사용자 ID만 owner_id로 저장합니다(요청 본문의 값은 무시).
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
+  traceRequest(request, response);
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
