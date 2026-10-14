@@ -1,0 +1,114 @@
+{
+  "_notice": "외부 전송을 통한 자료 빼돌리기의 알려진 형태를 정리한 목록입니다. decide.mjs는 심판의 격리 환경(import 없음) 때문에 이 패턴들을 파일 맨 위에 직접 옮겨 적어 둡니다 — 이 파일을 고치면 decide.mjs의 PATTERNS 상수도 같이 고쳐 주세요. 순서는 확신도 내림차순입니다. 용량 기준(큰 전송 50,000,000 바이트)과 반복·대량 파일 기준(3회, 50건), 규칙 수준 5, 낱말 목록, 확신도는 운영 측 연습 경보(xdr/fixtures/exfiltration.json)를 읽고 직접 정한 구현상 휴리스틱이며 과제가 제공한 기준도 심판의 정답표에서 가져온 값도 아닙니다. 경보 ID·사용자 이름·출발/목적지 주소·rule.mitre·묶음 표시는 어떤 판단 조건에도 쓰지 않습니다.",
+  "sources": [
+    {
+      "id": "mitre-t1041",
+      "title": "MITRE ATT&CK T1041 Exfiltration Over C2 Channel",
+      "url": "https://attack.mitre.org/techniques/T1041/",
+      "checked": "2026-10-14에 공식 페이지 앞부분(전체 중 약 78%)을 확인: 전술 Exfiltration. 이미 있는 명령·제어(C2) 통로로 데이터를 빼내는 기법. 설명이 '명령 통로'를 직접 밝힌 경보에만 근거로 연결하며, 일반적인 외부 전송을 C2 유출로 단정하지 않음."
+    },
+    {
+      "id": "mitre-t1048",
+      "title": "MITRE ATT&CK T1048 Exfiltration Over Alternative Protocol",
+      "url": "https://attack.mitre.org/techniques/T1048/",
+      "checked": "2026-10-14에 공식 페이지 확인: 전술 Exfiltration. 기존 C2 통로와 다른 프로토콜로 데이터를 빼내며 주 C2 서버와 다른 목적지로 보낼 수도 있는 기법. 설명이 평소 쓰지 않던 포트·다른 통로를 직접 밝힌 경보에만 근거로 연결함."
+    }
+  ],
+  "baseline": {
+    "state": "none_provided",
+    "note": "평소 전송량, 기존 목적지 목록, 업무 시간, 승인된 백업·업무 전송 정보는 저장소와 운영 측 자료 어디에도 제공되지 않습니다. 그래서 '평소보다 큼'·'처음 보는 목적지'·'업무 시간 밖'을 임의의 목록으로 확정하지 않고, 경보 설명이 스스로 밝힌 사실만 증거로 씁니다. 전송 방향은 별도 필드가 없어 설명 문장(나갔습니다·올라갔습니다·복사됐습니다·전송됐습니다)에서만 읽습니다. data.bytes에는 단위 필드가 없어 필드 이름대로 바이트로 읽고, 'KB'·'MB'·'GB'가 붙은 값은 1024 단위로 바꿉니다. 값이 없거나 숫자가 아니면 0이 아니라 '알 수 없음'으로 다룹니다."
+  },
+  "input": "경보 한 건에서 다섯 가지를 봅니다. (1) 설명: rule.description을 마침표로 나눈 문장. '아직 없습니다'·'실패'로 끝나거나 밝힌 문장은 전송이 일어났다고 보지 않습니다. (2) 전송량: data.bytes(알 수 없으면 null). (3) 파일 수·반복: data.files, data.count. (4) 규칙 수준: rule.level. (5) 목적지·출발 주소는 판단에 쓰지 않습니다(respond.mjs만 규칙 대상으로 씀). 경보 하나 안에 적힌 사실만 쓰며 과거 기록이나 다른 경보와의 관계를 추측하지 않습니다.",
+  "patterns": [
+    {
+      "name": "large_transfer_multi_signal",
+      "signal": "large_volume_plus_multiple_context",
+      "confidence": 0.93,
+      "condition": "외부로 전송이 일어났고(전송량 50,000,000 바이트 이상) 설명이 밝힌 보강 증거가 둘 이상 있음: 처음 보는 목적지, 업무 시간 밖, 압축 파일, 평소 쓰지 않던 포트·명령 통로, 반복 3회 이상, 대량 파일(50건 이상 또는 자료실 전체).",
+      "reference": "T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "name": "large_transfer_unusual_channel",
+      "signal": "large_volume_plus_unusual_port_or_c2",
+      "confidence": 0.9,
+      "condition": "큰 전송이면서 설명이 평소 쓰지 않던 포트 또는 명령 통로를 직접 밝힘.",
+      "reference": "T1048·T1041: 평소 쓰지 않던 통로나 명령 통로로 나가는 큰 전송은 대체 프로토콜·C2 통로 유출의 알려진 형태입니다(설명이 직접 밝힌 경우만)."
+    },
+    {
+      "name": "large_transfer_new_destination",
+      "signal": "large_volume_plus_new_destination",
+      "confidence": 0.89,
+      "condition": "큰 전송이면서 설명이 처음 보는 목적지·주소임을 밝힘.",
+      "reference": "T1048: 처음 보는 목적지로 나가는 큰 전송은 평소 전송과 구분되는 반출 후보입니다. 목적지 목록이 제공되지 않아 설명이 밝힌 경우에만 씁니다."
+    },
+    {
+      "name": "large_repeated_transfer",
+      "signal": "large_volume_plus_repetition",
+      "confidence": 0.88,
+      "condition": "큰 전송이면서 같은 목적지로의 반복이 3회 이상.",
+      "reference": "T1048: 큰 전송이 반복되면 일회성 업무 전송보다 지속적인 반출에 가깝습니다."
+    },
+    {
+      "name": "large_bulk_file_transfer",
+      "signal": "large_volume_plus_bulk_files",
+      "confidence": 0.88,
+      "condition": "큰 전송이면서 파일 수가 50건 이상이거나 설명이 자료실 전체의 복사를 밝힘.",
+      "reference": "T1048: 한꺼번에 많은 파일이 나가는 것은 자료 수집 뒤 일괄 반출의 알려진 형태입니다."
+    },
+    {
+      "name": "large_off_hours_transfer",
+      "signal": "large_volume_plus_off_hours",
+      "confidence": 0.87,
+      "condition": "큰 전송이면서 설명이 업무(수업) 시간 밖임을 밝힘. 시각 값만으로는 판단하지 않음.",
+      "reference": "T1048: 업무 시간 밖의 큰 전송은 정상 업무와 구분되는 보강 증거입니다."
+    },
+    {
+      "name": "large_archive_transfer",
+      "signal": "large_volume_plus_archive",
+      "confidence": 0.87,
+      "condition": "큰 전송이면서 설명이 압축 파일 전송을 밝힘.",
+      "reference": "T1048: 자료를 압축 파일로 묶어 내보내는 것은 반출 전 준비의 알려진 형태입니다."
+    },
+    {
+      "name": "transfer_with_context_below_volume",
+      "signal": "context_without_large_volume",
+      "confidence": 0.6,
+      "condition": "외부 전송이 일어났고 보강 증거가 있으나 전송량이 큰 기준 미만이거나 알 수 없음.",
+      "reference": "T1048: 보강 증거는 있으나 전송량이 작아 반출로 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "name": "large_transfer_without_context",
+      "signal": "large_volume_only",
+      "confidence": 0.6,
+      "condition": "큰 전송이지만 처음 보는 목적지·업무 시간 밖·압축 파일 같은 보강 증거가 없음.",
+      "reference": "대용량 하나만으로는 정상 백업·업무 전송과 구분할 수 없어 알림으로만 남깁니다."
+    },
+    {
+      "name": "routine_looking_transfer",
+      "signal": "routine_wording_with_attention_level",
+      "confidence": 0.55,
+      "condition": "규칙 수준이 5 이상이고 설명이 수업 자료 주소·평소 목적지·백업 같은 평소 전송처럼 보이는 표현을 포함하지만 전송량이나 횟수가 평소와 다르다고 밝힘.",
+      "reference": "정상 업무 전송처럼 보이지만 규모가 달라 사람이 볼 수 있게 알림으로만 남깁니다(승인 정보는 제공되지 않음)."
+    },
+    {
+      "name": "archive_or_bulk_without_confirmed_send",
+      "signal": "staging_without_external_send",
+      "confidence": 0.55,
+      "condition": "규칙 수준이 5 이상이고 압축 파일을 만들었거나 대량 자료를 읽었지만 외부 전송은 확인되지 않음.",
+      "reference": "T1048 준비 단계일 수 있으나 외부 전송이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "name": "exfil_wording_attention",
+      "signal": "transfer_wording_attention_level",
+      "confidence": 0.5,
+      "condition": "규칙 수준이 5 이상이고 설명에 전송·목적지·통로·압축 관련 낱말이 있으나 위 조합에는 맞지 않음.",
+      "reference": "T1048: 전송 관련 사건이지만 반출 증거가 부족해 알림으로만 남깁니다."
+    }
+  ],
+  "defaults": {
+    "no_known_exfiltration_pattern": { "confidence": 0.05, "reference": "알려진 자료 반출 패턴과 맞지 않는 사건입니다." },
+    "below_attention_level": { "confidence": 0.2, "reference": "전송 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다." }
+  },
+  "boosts": { "perCorroboration": 0.02, "cap": 0.99, "note": "block 패턴이 맞은 뒤 서로 다른 추가 보강 증거마다 확신도를 올립니다." },
+  "thresholds": { "block": 0.85, "alert": 0.5, "attentionRuleLevel": 5, "largeTransferBytes": 50000000, "repeatedCount": 3, "bulkFiles": 50 }
+}

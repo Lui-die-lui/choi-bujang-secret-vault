@@ -1,0 +1,282 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "exfiltration",
+  "decisions": [
+    {
+      "alertId": "ex-01",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-02",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-03",
+      "action": "block",
+      "confidence": 0.88,
+      "reason": "패턴 large_repeated_transfer: T1048: 큰 전송이 반복되면 일회성 업무 전송보다 지속적인 반출에 가깝습니다."
+    },
+    {
+      "alertId": "ex-04",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-05",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-06",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-07",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-08",
+      "action": "block",
+      "confidence": 0.88,
+      "reason": "패턴 large_bulk_file_transfer: T1048: 한꺼번에 많은 파일이 나가는 것은 자료 수집 뒤 일괄 반출의 알려진 형태입니다."
+    },
+    {
+      "alertId": "ex-09",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-10",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다."
+    },
+    {
+      "alertId": "ex-11",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 transfer_with_context_below_volume: T1048: 보강 증거는 있으나 전송량이 작아 반출로 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ex-12",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "패턴 routine_looking_transfer: 정상 업무 전송처럼 보이지만 규모가 달라 사람이 볼 수 있게 알림으로만 남깁니다(승인 정보는 제공되지 않음)."
+    },
+    {
+      "alertId": "ex-13",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "패턴 archive_or_bulk_without_confirmed_send: T1048 준비 단계일 수 있으나 외부 전송이 확인되지 않아 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ex-14",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 transfer_with_context_below_volume: T1048: 보강 증거는 있으나 전송량이 작아 반출로 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ex-15",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 transfer_with_context_below_volume: T1048: 보강 증거는 있으나 전송량이 작아 반출로 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ex-16",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "패턴 routine_looking_transfer: 정상 업무 전송처럼 보이지만 규모가 달라 사람이 볼 수 있게 알림으로만 남깁니다(승인 정보는 제공되지 않음)."
+    },
+    {
+      "alertId": "ex-17",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "패턴 routine_looking_transfer: 정상 업무 전송처럼 보이지만 규모가 달라 사람이 볼 수 있게 알림으로만 남깁니다(승인 정보는 제공되지 않음)."
+    },
+    {
+      "alertId": "ex-18",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 exfil_wording_attention: T1048: 전송 관련 사건이지만 반출 증거가 부족해 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ex-19",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "패턴 exfil_wording_attention: T1048: 전송 관련 사건이지만 반출 증거가 부족해 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ex-20",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "패턴 transfer_with_context_below_volume: T1048: 보강 증거는 있으나 전송량이 작아 반출로 단정하지 않고 알림으로만 남깁니다."
+    },
+    {
+      "alertId": "ex-21",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_exfiltration_pattern): 알려진 자료 반출 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ex-22",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_exfiltration_pattern): 알려진 자료 반출 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ex-23",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 전송 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "ex-24",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_exfiltration_pattern): 알려진 자료 반출 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ex-25",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_exfiltration_pattern): 알려진 자료 반출 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ex-26",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 전송 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "ex-27",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_exfiltration_pattern): 알려진 자료 반출 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ex-28",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "일치 패턴 없음(below_attention_level): 전송 관련 낱말은 있으나 규칙 수준이 5 미만이라 기록만 남깁니다."
+    },
+    {
+      "alertId": "ex-29",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_exfiltration_pattern): 알려진 자료 반출 패턴과 맞지 않는 사건입니다."
+    },
+    {
+      "alertId": "ex-30",
+      "action": "record",
+      "confidence": 0.05,
+      "reason": "일치 패턴 없음(no_known_exfiltration_pattern): 알려진 자료 반출 패턴과 맞지 않는 사건입니다."
+    }
+  ],
+  "counts": {
+    "block": 10,
+    "alert": 10,
+    "record": 10
+  },
+  "generatedAt": "2026-10-14T02:59:58.440Z",
+  "totalAlerts": 30,
+  "readAlertsRows": 30,
+  "loggedLinesThisRun": 30,
+  "countsSum": 30,
+  "patternsInSyncWithDecide": true,
+  "patternCount": 12,
+  "labelsAvailable": true,
+  "falsePositiveCount": 0,
+  "falsePositiveAlertIds": [],
+  "normalInDenyRuleCount": 0,
+  "normalInDenyRuleAlertIds": [],
+  "sourceRegisteredAsDestinationCount": 0,
+  "labelMismatchAlertIds": [],
+  "nonBlockBasisInRulesCount": 0,
+  "activeRuleCountAfterExpiry": 0,
+  "unresolvedBlocks": [],
+  "ruleChangesThisRun": {
+    "created": 0,
+    "extended": 0,
+    "unchanged": 10
+  },
+  "blockRuleCount": 8,
+  "blockRules": [
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-01",
+        "ex-03"
+      ]
+    },
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-02",
+        "ex-04"
+      ]
+    },
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-05"
+      ]
+    },
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-06"
+      ]
+    },
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-07"
+      ]
+    },
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-08"
+      ]
+    },
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-09"
+      ]
+    },
+    {
+      "expiresAt": "2026-10-14T03:59:57.663Z",
+      "basisAlertIds": [
+        "ex-10"
+      ]
+    }
+  ],
+  "connection": {
+    "ruleFile": {
+      "state": "created",
+      "path": "xdr/exfiltration/blocklist.json",
+      "ruleCount": 8
+    },
+    "judgeApplied": {
+      "state": "not_possible",
+      "reason": "판정기 요청 계약(docs/DECIDER_REQUEST.md)에 목적지 필드가 없고 계약에 없는 필드는 만들어 읽지 않습니다."
+    },
+    "networkBlock": {
+      "state": "not_possible",
+      "reason": "이 저장소는 자료를 제공하는 인바운드 서비스이며 PC의 아웃바운드 전송을 중계하거나 차단하는 경로가 없습니다. 자료 API의 인바운드 거부는 아웃바운드 전송 차단과 같지 않습니다."
+    }
+  },
+  "note": "운영 측 연습 경보 기준의 로컬 결과입니다. 정상 오차단은 직접 붙인 묶음 표시(exfiltration.expected.json, 심판의 정답표가 아님) 기준으로만 셉니다. 큰 전송 기준(50,000,000 바이트)은 과제 제공 기준이 아니라 구현상 휴리스틱입니다. 규칙은 xdr/exfiltration/blocklist.json(목적지 후보)에만 있고 학생 판정기(src/decider.mjs)나 실제 네트워크 전송 경로에는 연결되지 않았습니다. 심판 판정 결과가 아닙니다."
+}

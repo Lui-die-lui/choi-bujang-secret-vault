@@ -1,0 +1,76 @@
+[
+  {
+    "destinationIp": "203.0.113.50",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다.",
+    "basisAlertIds": [
+      "ex-01",
+      "ex-03"
+    ],
+    "createdAtMs": 1791946797663
+  },
+  {
+    "destinationIp": "198.51.100.40",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다.",
+    "basisAlertIds": [
+      "ex-02",
+      "ex-04"
+    ],
+    "createdAtMs": 1791946797663
+  },
+  {
+    "destinationIp": "203.0.113.55",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다.",
+    "basisAlertIds": [
+      "ex-05"
+    ],
+    "createdAtMs": 1791946797663
+  },
+  {
+    "destinationIp": "192.0.2.90",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다.",
+    "basisAlertIds": [
+      "ex-06"
+    ],
+    "createdAtMs": 1791946797663
+  },
+  {
+    "destinationIp": "198.51.100.45",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다.",
+    "basisAlertIds": [
+      "ex-07"
+    ],
+    "createdAtMs": 1791946797663
+  },
+  {
+    "destinationIp": "203.0.113.60",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_bulk_file_transfer: T1048: 한꺼번에 많은 파일이 나가는 것은 자료 수집 뒤 일괄 반출의 알려진 형태입니다.",
+    "basisAlertIds": [
+      "ex-08"
+    ],
+    "createdAtMs": 1791946797663
+  },
+  {
+    "destinationIp": "203.0.113.61",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다.",
+    "basisAlertIds": [
+      "ex-09"
+    ],
+    "createdAtMs": 1791946797663
+  },
+  {
+    "destinationIp": "198.51.100.46",
+    "expiresAtMs": 1791950397663,
+    "reason": "패턴 large_transfer_multi_signal: T1041·T1048: 큰 전송에 서로 다른 보강 증거가 겹치면 정상 업무 전송과 구분되는 자료 반출입니다.",
+    "basisAlertIds": [
+      "ex-10"
+    ],
+    "createdAtMs": 1791946797663
+  }
+]

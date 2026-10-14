@@ -1,0 +1,12 @@
+{
+  "_notice": "시험용 기대값입니다. 운영 측 연습 경보(xdr/fixtures/exfiltration.json)의 설명·전송량·규칙 수준을 읽고 직접 붙인 묶음 표시이며, 심판의 정답표가 아닙니다(운영 측 xdr/README.md는 '명확한 공격, 애매한 시도, 정상 이벤트가 함께 들어 있다'고만 설명합니다). 판단(decide.mjs)에는 쓰지 않고, 실행 뒤 확인(정상 이벤트 오차단·묶음별 결과)에만 씁니다.",
+  "_labels": "attack=명확한 공격(차단 기대), ambiguous=애매한 시도(알림 기대), benign=정상 이벤트(기록만 기대, 차단되면 오차단)",
+  "byAlertId": {
+    "ex-01": "attack", "ex-02": "attack", "ex-03": "attack", "ex-04": "attack", "ex-05": "attack",
+    "ex-06": "attack", "ex-07": "attack", "ex-08": "attack", "ex-09": "attack", "ex-10": "attack",
+    "ex-11": "ambiguous", "ex-12": "ambiguous", "ex-13": "ambiguous", "ex-14": "ambiguous", "ex-15": "ambiguous",
+    "ex-16": "ambiguous", "ex-17": "ambiguous", "ex-18": "ambiguous", "ex-19": "ambiguous", "ex-20": "ambiguous",
+    "ex-21": "benign", "ex-22": "benign", "ex-23": "benign", "ex-24": "benign", "ex-25": "benign",
+    "ex-26": "benign", "ex-27": "benign", "ex-28": "benign", "ex-29": "benign", "ex-30": "benign"
+  }
+}
