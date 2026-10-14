@@ -21,6 +21,7 @@
     "GET /api/device/challenge",
     "POST /api/device/request",
     "POST /api/device/verify",
+    "GET /api/ops/summary",
     "POST /api/auth/login",
     "POST /api/auth/refresh",
     "POST /api/auth/logout"
