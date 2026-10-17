@@ -124,16 +124,19 @@
     .brand b { display: block; font-weight: 600; font-size: 14px; letter-spacing: .02em; }
     .brand small { display: block; font-size: 11.5px; color: var(--ink-2); }
     .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .quick a { display: grid; justify-items: center; gap: 6px; padding: 16px 8px 12px; text-decoration: none; color: var(--ink-0); font-size: 13px; font-weight: 500;
+    .quick button { display: grid; justify-items: center; gap: 6px; padding: 16px 8px 12px; color: var(--ink-0); font: 500 13px/1.2 var(--font); cursor: pointer;
       transition: transform .15s, background .15s; }
-    .quick a:hover { transform: translateY(-2px); background: var(--glass-strong); }
+    .quick button:hover, .quick button[aria-current="page"] { transform: translateY(-2px); background: var(--glass-strong); }
     .quick svg { width: 18px; height: 18px; }
     .tree { display: grid; gap: 2px; }
     .tree-head { display: flex; align-items: center; gap: 10px; padding: 6px 8px; font-size: 13px; color: var(--ink-2); }
-    .tree a { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px 9px 22px;
+    .tree button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; text-align: left; font: 400 14px/1.2 var(--font); background: none; box-shadow: none;
       border-radius: 14px; color: var(--ink-1); text-decoration: none; font-size: 14px; transition: background .15s, color .15s; }
-    .tree a::before { content: ""; position: absolute; left: 10px; top: 50%; width: 4px; height: 4px; border-radius: 50%; background: var(--ink-2); transform: translateY(-50%); }
-    .tree a:hover { background: var(--glass-strong); color: var(--ink-0); }
+    .tree button svg { width: 17px; height: 17px; flex: none; opacity: .75; }
+    .tree button .count { margin-left: auto; }
+    .tree button:hover { background: var(--glass); color: var(--ink-0); }
+    .tree button[aria-current="page"] { background: var(--glass-strong); color: var(--ink-0); font-weight: 600; box-shadow: var(--shadow-soft); }
+    .tree button[aria-current="page"] svg { opacity: 1; }
     .count { min-width: 26px; padding: 3px 8px; border-radius: 999px; text-align: center; font: 500 11px/1.2 var(--font); background: var(--pill); color: var(--pill-ink); }
     .side-note { margin-top: auto; padding: 0 8px; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
     .side-note b { display: block; color: var(--ink-1); font-weight: 600; margin-bottom: 2px; }
@@ -235,6 +238,65 @@
     #device-panel[hidden] + .locked, #ops-panel[hidden] + .locked, #vault-locked { display: block; }
     body:has(#my-notes:not([hidden])) #vault-locked { display: none; }
 
+    /* ---------- 접속 창: 로그인·기기 인증 전에는 전체 화면을 흐리게 덮습니다 ---------- */
+    .gate { display: grid; gap: 16px; align-content: start; }
+    .gate-card { display: grid; gap: 16px; }
+    .gate-head, .gate-steps, .gate-note { display: none; }
+    .gate #auth h3 { margin-bottom: 0; }
+    #auth:has(#session-info:not([hidden])) h3 { display: none; }
+    #auth:has(#session-info:not([hidden])) #session-info { margin-top: 0; }
+    :root:not(:has(#my-notes:not([hidden]))) body { overflow: hidden; }
+    :root:not(:has(#my-notes:not([hidden]))) .gate {
+      position: fixed; inset: 0; z-index: 40; display: grid; justify-items: center; align-content: safe center; padding: 20px; overflow-y: auto;
+      background: color-mix(in srgb, var(--glass-solid) 35%, transparent);
+      -webkit-backdrop-filter: blur(22px) saturate(120%); backdrop-filter: blur(22px) saturate(120%);
+      animation: gate-in .45s ease-out;
+    }
+    :root:not(:has(#my-notes:not([hidden]))) .gate-card {
+      width: min(540px, 100%); padding: 30px 28px 24px; border-radius: 32px; background: var(--glass-strong); border: 1px solid var(--glass-border);
+      box-shadow: 0 40px 90px -30px #0000006b, 0 2px 8px #00000014;
+      -webkit-backdrop-filter: blur(30px) saturate(150%); backdrop-filter: blur(30px) saturate(150%);
+    }
+    :root:not(:has(#my-notes:not([hidden]))) .gate .panel { padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    :root:not(:has(#my-notes:not([hidden]))) .gate .auth-fields { grid-template-columns: minmax(0, 1fr); }
+    :root:not(:has(#my-notes:not([hidden]))) .gate-head { display: flex; align-items: center; gap: 14px; }
+    :root:not(:has(#my-notes:not([hidden]))) .gate-head h2 { font-size: 24px; }
+    :root:not(:has(#my-notes:not([hidden]))) .gate-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; }
+    :root:not(:has(#my-notes:not([hidden]))) .gate-note { display: block; margin: 0; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
+    .gate-steps li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 999px; font-size: 13px; color: var(--ink-2);
+      background: var(--ghost); }
+    .gate-steps span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 10.5px; border: 1px solid var(--hair-strong); }
+    :root:not(:has(#session-info:not([hidden]))) .gate-steps [data-gate="1"],
+    :root:has(#session-info:not([hidden])) .gate-steps [data-gate="2"] { color: var(--pill-ink); background: var(--pill); }
+    :root:not(:has(#session-info:not([hidden]))) .gate-steps [data-gate="1"] span,
+    :root:has(#session-info:not([hidden])) .gate-steps [data-gate="2"] span { border-color: currentColor; }
+    :root:has(#session-info:not([hidden])) .gate-steps [data-gate="1"] { color: var(--ink-0); }
+    :root:has(#session-info:not([hidden])) .gate-steps [data-gate="1"] span { background: var(--good-bg); border-color: transparent; }
+    /* 인증이 끝나면 접속 창은 제자리(접속 관문)로 내려가고, 화면이 흐림에서 또렷하게 드러납니다 */
+    :root:has(#my-notes:not([hidden])) .canvas { animation: reveal .7s cubic-bezier(.2, .8, .2, 1); }
+    @keyframes gate-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes reveal { from { opacity: .3; filter: blur(12px); transform: translateY(24px); } to { opacity: 1; filter: none; transform: none; } }
+    #offline-notice { position: relative; z-index: 45; }
+
+    /* ---------- 화면 공간: 자료실이 열린 뒤에는 고른 화면만 보여 줍니다 ---------- */
+    :root:has(#my-notes:not([hidden])) body:not([data-view="home"]) [data-view-panel="home"],
+    :root:has(#my-notes:not([hidden])) body:not([data-view="ops"]) [data-view-panel="ops"],
+    :root:has(#my-notes:not([hidden])) body:not([data-view="vault"]) [data-view-panel="vault"] { display: none; }
+    /* 떠오르는 전환: 새로 나타나는 요소가 아래에서 위로 살짝 올라오며 또렷해집니다 */
+    @keyframes rise { from { opacity: 0; transform: translateY(18px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+    [data-view-panel], .rise { animation: rise .55s cubic-bezier(.2, .8, .2, 1) both; }
+    [data-view-panel="home"] + [data-view-panel="home"] { animation-delay: .06s; }
+    /* 접속 창이 떠 있는 동안에는 바깥 공간을 움직이지 않습니다(고정된 접속 창이 흔들리지 않도록) */
+    :root:not(:has(#my-notes:not([hidden]))) [data-view-panel] { animation: none; }
+    :root:not(:has(#my-notes:not([hidden]))) .gate-card { animation: rise .6s cubic-bezier(.2, .8, .2, 1) both; }
+    .gate #login-form, .gate #session-info, .gate #device-panel, .gate #device-code-line, .gate-steps li {
+      animation: rise .55s cubic-bezier(.2, .8, .2, 1) both; }
+    .gate #device-panel { animation-delay: .12s; }
+    .gate-steps li:nth-child(2) { animation-delay: .05s; }
+    .gate-steps li:nth-child(3) { animation-delay: .1s; }
+    .gate-steps li { transition: background .45s, color .45s; }
+    .card-flow > li { animation: rise .5s cubic-bezier(.2, .8, .2, 1) both; }
+
     /* ---------- 작전실 ---------- */
     #ops-panel { padding: 26px; display: grid; gap: 20px; }
     .ops-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
@@ -314,19 +376,27 @@
       -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); transform: translate(14px, 14px); }
 
     /* ---------- 자료실 ---------- */
-    .vault { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
-    #notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
     #notes:empty { display: none; }
     #notes li, #my-notes-list li { padding: 18px 20px; border-radius: 22px; background: var(--glass); border: 1px solid var(--glass-border); box-shadow: var(--shadow-soft);
       -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
     #notes strong, #my-notes-list strong { display: block; font-size: 17px; font-weight: 500; margin-bottom: 4px; }
     #notes span, #my-notes-list span { color: var(--ink-1); font-size: 14.5px; line-height: 1.7; }
-    .my-notes { padding: 24px; }
-    .my-notes h2 { font-size: 18px; margin-bottom: 14px; }
-    #create-note-form { display: grid; gap: 12px; }
-    #create-note-form button[type="submit"] { justify-self: end; }
-    #my-notes-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+    .vault, .my-notes { display: grid; gap: 18px; }
+    .vault { gap: 28px; }
+    .vault-block { display: grid; gap: 12px; }
+    .vault-block:has(#notes:empty) { display: none; }
+    .block-title { display: flex; align-items: baseline; gap: 12px; margin: 0 4px; }
+    .block-title h2, .block-title h3 { font-size: 18px; }
+    /* 메모 카드: 높이가 다른 카드를 여러 단에 빈틈 없이 채웁니다 */
+    .card-flow { list-style: none; margin: 0; padding: 0; columns: 280px 3; column-gap: 14px; }
+    .card-flow > li { break-inside: avoid; margin: 0 0 14px; }
+    #my-notes-list:empty::before { content: "아직 메모가 없습니다. 위에서 첫 메모를 추가해 보세요."; display: block; padding: 28px; text-align: center;
+      color: var(--ink-2); border: 1px dashed var(--hair-strong); border-radius: 22px; }
+    .composer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto; gap: 12px 14px; align-items: end; padding: 18px 20px; border-radius: 26px; }
+    .composer textarea { min-height: 48px; height: 48px; resize: vertical; }
+    .composer .auth-error { grid-column: 1 / -1; margin: 0; }
     #my-notes-list li { display: grid; gap: 10px; background: var(--glass-strong); }
+    #my-notes-list li > span { white-space: pre-wrap; }
     #my-notes-list .note-actions { display: flex; gap: 8px; justify-content: flex-end; }
     #my-notes-list .note-actions button { padding: 9px 16px; font-size: 13px; }
     #my-notes-list li > input, #my-notes-list li > textarea { margin-top: 0; }
@@ -346,8 +416,8 @@
         gap: 10px; padding: 10px 12px; border-radius: 24px; background: var(--glass-solid); }
       .quick, .side-note, .tree-head, .brand small { display: none; }
       .tree { order: 3; flex-basis: 100%; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-      .tree a { flex: none; padding: 7px 12px; border: 1px solid var(--glass-border); border-radius: 999px; font-size: 13px; }
-      .tree a::before, .tree .count { display: none; }
+      .tree button { flex: none; width: auto; padding: 8px 14px; border: 1px solid var(--glass-border); border-radius: 999px; font-size: 13px; }
+      .tree .count, .tree button svg { display: none; }
       .side-foot { margin-left: auto; }
       .live-pill { height: 38px; flex: none; }
       .icon-btn { width: 38px; height: 38px; }
@@ -359,7 +429,8 @@
     @media (max-width: 640px) {
       .steps { grid-template-columns: minmax(0, 1fr); }
       .steps li { min-height: 0; }
-      .auth-fields, .rules { grid-template-columns: minmax(0, 1fr); }
+      .auth-fields, .rules, .composer { grid-template-columns: minmax(0, 1fr); }
+      .composer button { justify-self: end; }
       .callout { position: static; margin-top: 8px; }
       .panel, #ops-panel, .engage, .card { padding: 18px; }
       .live-pill [data-when] { font-size: 12.5px; }
@@ -371,18 +442,17 @@
   <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
   <div class="app" id="top">
     <aside class="side glass" aria-label="구역 이동">
-      <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">B/</span>
+      <a class="brand" href="./" data-go="home"><span class="brand-mark" aria-hidden="true">B/</span>
         <span><b>BYTE BACK</b><small>Student Defense Platform · 12단계</small></span></a>
       <div class="quick">
-        <a class="tile" href="#sec-access"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>접속</a>
-        <a class="tile" href="#sec-ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v9l6.4 6.4A9 9 0 1 1 12 3z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>작전실</a>
+        <button type="button" class="tile" data-go="ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v9l6.4 6.4A9 9 0 1 1 12 3z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>작전실</button>
+        <button type="button" class="tile" data-go="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>자료실</button>
       </div>
-      <nav class="tree">
-        <div class="tree-head">구역</div>
-        <a href="#sec-access">접속 관문 <span class="count">01</span></a>
-        <a href="#sec-device">기기 승인 <span class="count">02</span></a>
-        <a href="#sec-ops">탈환 작전실 <span class="count">03</span></a>
-        <a href="#sec-vault">자료실 <span class="count">04</span></a>
+      <nav class="tree" aria-label="화면">
+        <div class="tree-head">화면</div>
+        <button type="button" data-go="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>개요 · 접속 <span class="count">01</span></button>
+        <button type="button" data-go="ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v9l6.4 6.4A9 9 0 1 1 12 3z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>탈환 작전실 <span class="count">02</span></button>
+        <button type="button" data-go="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>자료실 <span class="count">03</span></button>
       </nav>
       <div class="side-note"><b>표시 원칙</b>서버가 돌려준 값만 그립니다. 조회 실패·미연결·0건은 서로 바꿔 표시하지 않으며, 이 화면의 수치는 공식 심판 판정이 아닙니다.</div>
       <div class="side-foot">
@@ -405,34 +475,59 @@
           <h1>BYTE BACK 자료실</h1>
         </div>
       </header>
-      <p class="lede">아래 기록은 모두 실습을 위해 만든 가상 자료입니다. 자료는 서버가 로그인과 이 기기의 등록 여부를 확인한 뒤에만 열립니다.</p>
+      <p class="lede" data-view-panel="home">아래 기록은 모두 실습을 위해 만든 가상 자료입니다. 자료는 서버가 로그인과 이 기기의 등록 여부를 확인한 뒤에만 열립니다.</p>
 
-      <ol class="steps" aria-label="자료실이 열리는 순서">
+      <ol class="steps" data-view-panel="home" aria-label="자료실이 열리는 순서">
         <li class="glass" data-step="1"><b>로그인</b><span class="sub-label">서버가 신원 확인</span><span class="n">01</span></li>
         <li class="glass" data-step="2"><b>기기 승인</b><span class="sub-label">등록부의 승인 기기 확인</span><span class="n">02</span></li>
         <li class="glass" data-step="3"><b>자료실 열림</b><span class="sub-label">작전실·메모 조회</span><span class="n">03</span></li>
       </ol>
 
-      <section id="sec-access" aria-labelledby="access-title">
+      <section id="sec-access" data-view-panel="home" aria-labelledby="access-title">
         <div class="section-title"><h2 id="access-title">접속 관문</h2><span class="sub-label">Access gate</span></div>
         <div class="two">
-          <div class="auth panel glass" id="auth">
-            <h3>학생 로그인</h3>
-            <form id="login-form">
-              <div class="auth-fields">
-                <label>이메일
-                  <input type="email" id="login-email" required autocomplete="email">
-                </label>
-                <label>비밀번호
-                  <input type="password" id="login-password" required autocomplete="current-password">
-                </label>
+          <!-- 로그인·기기 인증이 끝나기 전에는 이 묶음이 화면 전체를 흐리게 덮는 접속 창이 됩니다(CSS만으로 전환). -->
+          <div class="gate" id="gate" role="group" aria-labelledby="gate-title">
+            <div class="gate-card">
+              <div class="gate-head">
+                <span class="brand-mark" aria-hidden="true">B/</span>
+                <div><h2 id="gate-title">자료실 접속</h2><div class="sub-label">로그인한 뒤 이 기기의 승인을 확인하면 전체 화면이 열립니다</div></div>
               </div>
-              <button type="submit">로그인</button>
-              <p class="auth-error" id="login-error" role="alert"></p>
-            </form>
-            <div id="session-info" hidden>
-              <p>로그인됨: <strong id="session-email"></strong></p>
-              <button type="button" id="logout-button">로그아웃</button>
+              <ol class="gate-steps" aria-label="접속 단계">
+                <li data-gate="1"><span>01</span>로그인</li>
+                <li data-gate="2"><span>02</span>기기 인증</li>
+                <li data-gate="3"><span>03</span>자료실 열림</li>
+              </ol>
+              <div class="auth panel glass" id="auth">
+                <h3>학생 로그인</h3>
+                <form id="login-form">
+                  <div class="auth-fields">
+                    <label>이메일
+                      <input type="email" id="login-email" required autocomplete="email">
+                    </label>
+                    <label>비밀번호
+                      <input type="password" id="login-password" required autocomplete="current-password">
+                    </label>
+                  </div>
+                  <button type="submit">로그인</button>
+                  <p class="auth-error" id="login-error" role="alert"></p>
+                </form>
+                <div id="session-info" hidden>
+                  <p>로그인됨: <strong id="session-email"></strong></p>
+                  <button type="button" id="logout-button">로그아웃</button>
+                </div>
+              </div>
+              <div class="panel glass" id="device-panel" hidden>
+                <h3>이 기기의 승인 상태</h3>
+                <p id="device-status" aria-live="polite"></p>
+                <p id="device-code-line" hidden>이 기기의 확인 코드: <span id="device-code"></span> (승인하는 사람이 등록부에서 같은 코드인지 확인합니다)</p>
+                <div class="row-end">
+                  <button type="button" id="device-request" hidden>이 기기 승인 요청</button>
+                  <button type="button" id="device-check" hidden>승인 상태 다시 확인</button>
+                </div>
+                <p class="auth-error" id="device-error" role="alert"></p>
+              </div>
+              <p class="gate-note">홈 화면에 설치해도 기기 확인이 끝난 것은 아닙니다. 서버에 등록·승인된 기기임을 확인받아야 자료가 보입니다.</p>
             </div>
           </div>
           <div class="panel glass boundary">
@@ -442,22 +537,7 @@
         </div>
       </section>
 
-      <section id="sec-device" aria-labelledby="device-title">
-        <div class="section-title"><h2 id="device-title">기기 승인</h2><span class="sub-label">Device registry</span></div>
-        <div class="panel glass" id="device-panel" hidden>
-          <h3>이 기기의 승인 상태</h3>
-          <p id="device-status" aria-live="polite"></p>
-          <p id="device-code-line" hidden>이 기기의 확인 코드: <span id="device-code"></span> (승인하는 사람이 등록부에서 같은 코드인지 확인합니다)</p>
-          <div class="row-end">
-            <button type="button" id="device-request" hidden>이 기기 승인 요청</button>
-            <button type="button" id="device-check" hidden>승인 상태 다시 확인</button>
-          </div>
-          <p class="auth-error" id="device-error" role="alert"></p>
-        </div>
-        <div class="locked"><b>로그인 후 확인합니다</b>로그인하면 서버 등록부에서 이 기기의 승인 상태를 읽어 옵니다.</div>
-      </section>
-
-      <section id="sec-ops" aria-labelledby="ops-title">
+      <section id="sec-ops" data-view-panel="ops" aria-labelledby="ops-title">
         <div class="glass glass-strong" id="ops-panel" hidden>
           <div class="ops-head">
             <div>
@@ -482,23 +562,26 @@
         </div>
       </section>
 
-      <section id="sec-vault" aria-labelledby="vault-title">
+      <section id="sec-vault" data-view-panel="vault" aria-labelledby="vault-title">
         <div class="section-title"><h2 id="vault-title">자료실</h2><span class="sub-label">Vault</span></div>
         <div class="vault">
-          <ul id="notes" aria-live="polite"></ul>
-          <div class="my-notes glass" id="my-notes" hidden>
-            <h2>내 메모</h2>
-            <form id="create-note-form">
-              <label>제목
+          <div class="vault-block" id="notes-block">
+            <div class="block-title"><h3>자료 목록</h3><span class="sub-label">서버가 연 자료</span></div>
+            <ul id="notes" class="card-flow" aria-live="polite"></ul>
+          </div>
+          <div class="my-notes" id="my-notes" hidden>
+            <div class="block-title"><h2>내 메모</h2><span class="sub-label">본인 메모만 읽고 고칩니다</span></div>
+            <form id="create-note-form" class="composer glass">
+              <label class="c-title">제목
                 <input type="text" id="new-note-title" required>
               </label>
-              <label>내용
+              <label class="c-body">내용
                 <textarea id="new-note-body" required></textarea>
               </label>
               <button type="submit">메모 추가</button>
               <p class="auth-error" id="create-note-error" role="alert"></p>
             </form>
-            <ul id="my-notes-list" aria-live="polite"></ul>
+            <ul id="my-notes-list" class="card-flow" aria-live="polite"></ul>
           </div>
         </div>
         <div class="locked" id="vault-locked"><b>자료는 기기 확인 뒤에 열립니다</b>서버가 로그인과 등록 기기를 확인하기 전에는 이 영역에 아무 자료도 내려오지 않습니다.</div>
@@ -1009,6 +1092,37 @@
       themeToggle.title = dark ? '라이트 모드' : '다크 모드';
       themeColor.setAttribute('content', dark ? '#0f2130' : '#adc5c8');
     }
+    // 화면 전환: 한 페이지 안에서 고른 공간만 보여 줍니다(주소 조각·브라우저 저장소 미사용).
+    // 자료실이 열리면 작전실로, 닫히면 개요(접속 창)로 돌아갑니다. 자료 요청에는 관여하지 않습니다.
+    function go(view) {
+      document.body.dataset.view = view;
+      for (const button of document.querySelectorAll('[data-go]')) {
+        if (button.dataset.go === view && button.tagName === 'BUTTON') button.setAttribute('aria-current', 'page');
+        else button.removeAttribute('aria-current');
+      }
+      window.scrollTo({ top: 0 });
+    }
+    document.addEventListener('click', event => {
+      const target = event.target.closest?.('[data-go]');
+      if (!target) return;
+      event.preventDefault();
+      go(target.dataset.go);
+    });
+    let vaultWasOpen = false;
+    new MutationObserver(() => {
+      const open = !myNotesSection.hidden;
+      if (open !== vaultWasOpen) go(open ? 'ops' : 'home');
+      vaultWasOpen = open;
+    }).observe(myNotesSection, { attributes: true, attributeFilter: ['hidden'] });
+    go('home');
+
+    // 기기 상태 문구가 바뀌면 그 문구만 다시 떠오르게 합니다(문구 내용은 기존 코드가 정함).
+    new MutationObserver(() => {
+      deviceStatus.classList.remove('rise');
+      void deviceStatus.offsetWidth;
+      deviceStatus.classList.add('rise');
+    }).observe(deviceStatus, { childList: true, characterData: true, subtree: true });
+
     themeToggle.addEventListener('click', () => {
       document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
       showTheme();
