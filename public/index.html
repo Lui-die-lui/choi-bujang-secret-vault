@@ -6,7 +6,8 @@
   <title>BYTE BACK 자료실</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#101a28">
-  <link rel="icon" href="/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230a0c10'/%3E%3Cg fill='none' stroke='%23c6ff3d' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 8.5V5.5A1.5 1.5 0 0 1 5.5 4h3M15.5 4h3A1.5 1.5 0 0 1 20 5.5v3M20 15.5v3a1.5 1.5 0 0 1-1.5 1.5h-3M8.5 20h-3A1.5 1.5 0 0 1 4 18.5v-3'/%3E%3Cg%3E%3Cpath d='M16.5 12A4.5 4.5 0 1 1 15.18 8.82'/%3E%3Cpath d='M13 8.44L15.18 8.82L14.8 6.65'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='1.25' fill='%23c6ff3d' stroke='none'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="icon" href="/icon-192.png" sizes="192x192">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -110,10 +111,10 @@
     :root[data-theme="dark"] body { background-color: #08090f; }
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before { animation: none !important; transition: none !important; } }
     [hidden] { display: none !important; }
-    :focus-visible { outline: 2px solid var(--ink-0); outline-offset: 3px; border-radius: 10px; }
+    :focus-visible { outline: 2px solid var(--ring-a); outline-offset: 3px; border-radius: 10px; }
     h1, h2, h3 { margin: 0; font-weight: 500; letter-spacing: -.01em; }
     .num { font-family: var(--font); font-weight: 300; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-    .sub-label { font-size: 13px; color: var(--ink-2); font-style: italic; font-weight: 400; }
+    .sub-label { font-size: 13px; color: var(--ink-2); font-weight: 400; letter-spacing: .01em; }
     .glass {
       background: var(--glass); border: 1px solid var(--glass-border); border-radius: 28px; box-shadow: var(--shadow);
       -webkit-backdrop-filter: blur(22px) saturate(140%); backdrop-filter: blur(22px) saturate(140%);
@@ -144,30 +145,32 @@
       display: flex; flex-direction: column; gap: 20px; padding: 20px 16px; border-radius: 30px;
     }
     .brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px; color: inherit; text-decoration: none; }
-    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; flex: none;
-      background: var(--pill); color: var(--pill-ink); font: 700 13px/1 var(--font); }
+    .brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; flex: none;
+      background: var(--pill); color: var(--pill-ink); box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--glow) 70%, transparent); }
+    .brand-mark .logo { width: 22px; height: 22px; }
     .brand b { display: block; font-weight: 600; font-size: 14px; letter-spacing: .02em; }
     .brand small { display: block; font-size: 11.5px; color: var(--ink-2); }
     .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .quick button { display: grid; justify-items: center; gap: 6px; padding: 16px 8px 12px; color: var(--ink-0); font: 500 13px/1.2 var(--font); cursor: pointer;
-      transition: transform .15s, background .15s; }
-    .quick button:hover, .quick button[aria-current="page"] { transform: translateY(-2px); background: var(--glass-strong); }
+    .quick button { display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 76px; padding: 14px 8px; color: var(--ink-0); font: 500 13px/1.2 var(--font); cursor: pointer;
+      transition: transform .15s, background .15s, box-shadow .25s; }
+    .quick button:hover { transform: translateY(-2px); background: var(--glass-strong); }
+    .quick button[aria-current="page"] { background: var(--glass-strong); border-color: color-mix(in srgb, var(--ring-a) 55%, transparent); }
     .quick svg { width: 18px; height: 18px; }
     .tree { display: grid; gap: 2px; }
     .tree-head { display: flex; align-items: center; gap: 10px; padding: 6px 8px; font-size: 13px; color: var(--ink-2); }
-    .tree button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; text-align: left; font: 400 14px/1.2 var(--font); background: none; box-shadow: none;
+    .tree button { position: relative; display: flex; justify-content: flex-start; align-items: center; gap: 10px; width: 100%; min-height: 0; padding: 11px 12px; text-align: left; font: 400 14px/1.2 var(--font); background: none; box-shadow: none;
       border-radius: 14px; color: var(--ink-1); text-decoration: none; font-size: 14px; transition: background .15s, color .15s; }
     .tree button svg { width: 17px; height: 17px; flex: none; opacity: .75; }
     .tree button .count { margin-left: auto; }
     .tree button:hover { background: var(--glass); color: var(--ink-0); }
     .tree button[aria-current="page"] { background: var(--glass-strong); color: var(--ink-0); font-weight: 600; box-shadow: var(--shadow-soft); }
     .tree button[aria-current="page"] svg { opacity: 1; }
-    .count { min-width: 26px; padding: 3px 8px; border-radius: 999px; text-align: center; font: 500 11px/1.2 var(--font); background: var(--pill); color: var(--pill-ink); }
+    .count { display: inline-grid; place-items: center; min-width: 28px; height: 20px; padding: 0 8px; border-radius: 999px; text-align: center; font: 500 11px/1.2 var(--font); background: var(--pill); color: var(--pill-ink); }
     .side-note { margin-top: auto; padding: 0 8px; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
     .side-note b { display: block; color: var(--ink-1); font-weight: 600; margin-bottom: 2px; }
     .side-foot { display: flex; align-items: center; gap: 8px; }
     .icon-btn {
-      display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 50%; padding: 0; cursor: pointer;
+      display: grid; place-items: center; width: 42px; height: 42px; min-height: 0; flex: none; border-radius: 50%; padding: 0; cursor: pointer;
       color: var(--ink-0); background: var(--glass-strong); border: 1px solid var(--glass-border); box-shadow: var(--shadow-soft);
     }
     .icon-btn:hover { background: var(--glass-solid); }
@@ -177,20 +180,21 @@
     [data-theme="dark"] .theme-toggle .moon { display: none; }
     .live-pill { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 999px;
       background: var(--pill); color: var(--pill-ink); font-size: 13.5px; font-weight: 500; white-space: nowrap; }
-    .live-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .45; }
+    .live-pill .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: currentColor; opacity: .45; }
     .live-pill [data-when] { display: none; }
     body:not(:has(#session-info:not([hidden]))) .live-pill [data-when="out"],
     body:has(#session-info:not([hidden])):not(:has(#my-notes:not([hidden]))) .live-pill [data-when="device"],
     body:has(#my-notes:not([hidden])) .live-pill [data-when="open"] { display: inline; }
     body:has(#session-info:not([hidden])) .live-pill .dot { background: var(--warn); opacity: 1; }
-    body:has(#my-notes:not([hidden])) .live-pill .dot { background: var(--good); opacity: 1; box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 30%, transparent); }
+    body:has(#my-notes:not([hidden])) .live-pill .dot { background: currentColor; opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); animation: live-pulse 2.4s ease-in-out infinite; }
+    @keyframes live-pulse { 50% { box-shadow: 0 0 0 6px transparent; } }
 
     .canvas { min-width: 0; display: grid; gap: 22px; align-content: start; padding: 10px 6px 40px; }
     section { scroll-margin-top: 24px; }
     .page-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .orb { display: grid; place-items: center; width: 52px; height: 52px; flex: none; border-radius: 50%; color: var(--ink-0); }
-    .orb svg { width: 26px; height: 26px; }
-    .orb .spin { transform-origin: 13px 13px; animation: spin 18s linear infinite; }
+    .orb svg { width: 28px; height: 28px; color: var(--ring-a); }
+    .logo-spin .logo-loop { transform-origin: 12px 12px; transform-box: view-box; animation: spin 9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .eyebrow { font-size: 12.5px; color: var(--ink-2); letter-spacing: .04em; }
     .page-head h1 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 500; letter-spacing: -.02em; margin-top: 2px; }
@@ -233,11 +237,12 @@
       display: block; width: 100%; margin-top: 6px; padding: 12px 16px; border-radius: 16px; font: 15px var(--font); color: var(--ink-0);
       background: var(--field); border: 1px solid var(--glass-border); transition: border-color .15s, box-shadow .15s;
     }
-    input:focus, textarea:focus { outline: none; border-color: var(--ink-2); box-shadow: 0 0 0 4px var(--ghost); }
+    input:focus, textarea:focus { outline: none; border-color: var(--ring-a); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ring-a) 18%, transparent); }
     textarea { min-height: 88px; resize: vertical; }
     button {
-      font: 500 14px/1 var(--font); padding: 12px 20px; border-radius: 999px; cursor: pointer; border: 1px solid transparent;
-      background: var(--pill); color: var(--pill-ink); transition: background .15s, transform .1s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px;
+      font: 500 14px/1.2 var(--font); padding: 0 20px; border-radius: 999px; cursor: pointer; border: 1px solid transparent; white-space: nowrap;
+      background: var(--pill); color: var(--pill-ink); transition: background .15s, transform .1s, box-shadow .25s;
     }
     button:hover { background: var(--pill-hover); }
     button:active { transform: translateY(1px); }
@@ -246,10 +251,9 @@
       background: var(--glass-strong); color: var(--ink-0); border-color: var(--glass-border); box-shadow: var(--shadow-soft);
     }
     .btn-ghost:hover, #logout-button:hover, #device-check:hover, #my-notes-list .note-actions button:hover { background: var(--glass-solid); }
-    #ops-refresh { display: inline-flex; align-items: center; gap: 8px; }
     #ops-refresh svg { width: 15px; height: 15px; }
     .auth-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
-    #login-form button[type="submit"] { display: block; margin: 16px 0 0 auto; }
+    #login-form button[type="submit"] { display: flex; width: fit-content; margin: 16px 0 0 auto; }
     .auth-error { color: var(--crit-ink); margin: 10px 0 0; font-size: 13.5px; }
     .auth-error:empty { display: none; }
     #session-info:not([hidden]) { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
@@ -301,7 +305,7 @@
     :root:not(:has(#my-notes:not([hidden]))) .gate-head h2 { font-size: 24px; }
     :root:not(:has(#my-notes:not([hidden]))) .gate-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; }
     :root:not(:has(#my-notes:not([hidden]))) .gate-note { display: block; margin: 0; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
-    .gate-steps li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 999px; font-size: 13px; color: var(--ink-2);
+    .gate-steps li { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 10px; white-space: nowrap; border-radius: 999px; font-size: 13px; color: var(--ink-2);
       background: var(--ghost); }
     :root:not(:has(#session-info:not([hidden]))) .gate-steps [data-gate="1"],
     :root:has(#session-info:not([hidden])) .gate-steps [data-gate="2"] { color: var(--pill-ink); background: var(--pill); }
@@ -430,7 +434,7 @@
     #my-notes-list:empty::before { content: "아직 메모가 없습니다. 위에서 첫 메모를 추가해 보세요."; display: block; padding: 28px; text-align: center;
       color: var(--ink-2); border: 1px dashed var(--hair-strong); border-radius: 22px; }
     .block-title:has(.compose-btn) { align-items: center; }
-    .compose-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px 11px 14px; }
+    .compose-btn { margin-left: auto; padding: 0 20px 0 16px; }
     .compose-btn svg { width: 17px; height: 17px; }
     /* 작성 모달: 바탕을 흐리게 덮고, 창은 아래에서 떠오릅니다 */
     .compose-dialog {
@@ -450,7 +454,7 @@
     #my-notes-list li { display: grid; gap: 10px; background: var(--glass-strong); }
     #my-notes-list li > span { white-space: pre-wrap; }
     #my-notes-list .note-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    #my-notes-list .note-actions button { padding: 9px 16px; font-size: 13px; }
+    #my-notes-list .note-actions button { min-height: 34px; padding: 0 16px; font-size: 13px; }
     #my-notes-list li > input, #my-notes-list li > textarea { margin-top: 0; }
     footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 4px 0; border-top: 1px solid var(--hair);
       font-size: 12px; color: var(--ink-2); }
@@ -494,7 +498,7 @@
   <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
   <div class="app" id="top">
     <aside class="side glass" aria-label="구역 이동">
-      <a class="brand" href="./" data-go="home"><span class="brand-mark" aria-hidden="true">B/</span>
+      <a class="brand" href="./" data-go="home"><span class="brand-mark" aria-hidden="true"><svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5V5.5A1.5 1.5 0 0 1 5.5 4h3M15.5 4h3A1.5 1.5 0 0 1 20 5.5v3M20 15.5v3a1.5 1.5 0 0 1-1.5 1.5h-3M8.5 20h-3A1.5 1.5 0 0 1 4 18.5v-3"/><g class="logo-loop"><path d="M16.5 12A4.5 4.5 0 1 1 15.18 8.82"/><path d="M13 8.44L15.18 8.82L14.8 6.65"/></g><circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none"/></svg></span>
         <span><b>BYTE BACK</b><small>Student Defense Platform · 12단계</small></span></a>
       <div class="quick">
         <button type="button" class="tile" data-go="ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v9l6.4 6.4A9 9 0 1 1 12 3z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>작전실</button>
@@ -521,7 +525,7 @@
       <div id="offline-notice" class="notice" role="status" hidden>지금 오프라인입니다. 이 앱은 자료를 기기에 저장하지 않으므로, 연결이 돌아올 때까지 로그인·기기 확인·자료 보기를 할 수 없습니다.</div>
 
       <header class="page-head">
-        <span class="orb glass" aria-hidden="true"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="13" cy="13" r="3"/><g class="spin"><ellipse cx="13" cy="13" rx="11" ry="4.5" transform="rotate(-25 13 13)"/></g></svg></span>
+        <span class="orb glass" aria-hidden="true"><svg class="logo logo-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5V5.5A1.5 1.5 0 0 1 5.5 4h3M15.5 4h3A1.5 1.5 0 0 1 20 5.5v3M20 15.5v3a1.5 1.5 0 0 1-1.5 1.5h-3M8.5 20h-3A1.5 1.5 0 0 1 4 18.5v-3"/><g class="logo-loop"><path d="M16.5 12A4.5 4.5 0 1 1 15.18 8.82"/><path d="M13 8.44L15.18 8.82L14.8 6.65"/></g><circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none"/></svg></span>
         <div>
           <div class="eyebrow">BYTE BACK · 12단계 탈환 작전실</div>
           <h1>BYTE BACK 자료실</h1>
@@ -542,7 +546,7 @@
           <div class="gate" id="gate" role="group" aria-labelledby="gate-title">
             <div class="gate-card">
               <div class="gate-head">
-                <span class="brand-mark" aria-hidden="true">B/</span>
+                <span class="brand-mark" aria-hidden="true"><svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5V5.5A1.5 1.5 0 0 1 5.5 4h3M15.5 4h3A1.5 1.5 0 0 1 20 5.5v3M20 15.5v3a1.5 1.5 0 0 1-1.5 1.5h-3M8.5 20h-3A1.5 1.5 0 0 1 4 18.5v-3"/><g class="logo-loop"><path d="M16.5 12A4.5 4.5 0 1 1 15.18 8.82"/><path d="M13 8.44L15.18 8.82L14.8 6.65"/></g><circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none"/></svg></span>
                 <div><h2 id="gate-title">자료실 접속</h2><div class="sub-label">로그인한 뒤 이 기기의 승인을 확인하면 전체 화면이 열립니다</div></div>
               </div>
               <ol class="gate-steps" aria-label="접속 단계">
