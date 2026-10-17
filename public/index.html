@@ -47,7 +47,7 @@
       --crit: #ec2f62;  --crit-ink: #b5143d; --crit-bg: #ff4d7a1f;
       --info: #6d5dfc;  --info-ink: #4636d1; --info-bg: #6d5dfc1f;
       --hatch: #6d5dfc33;
-      --spot: #6d5dfc1f;
+      --spot: #6d5dfc26;
       --glow: #6d5dfc;
       --ring-a: #6d5dfc;
       --ring-b: #a6e22e;
@@ -80,7 +80,7 @@
       --crit: #ff4d7a;  --crit-ink: #ff7d9d; --crit-bg: #ff4d7a26;
       --info: #8b7bff;  --info-ink: #b2a8ff; --info-bg: #8b7bff26;
       --hatch: #c6ff3d24;
-      --spot: #c6ff3d1a;
+      --spot: #c6ff3d21;
       --glow: #c6ff3d;
       --ring-a: #c6ff3d;
       --ring-b: #8b7bff;
@@ -120,8 +120,9 @@
       -webkit-backdrop-filter: blur(22px) saturate(140%); backdrop-filter: blur(22px) saturate(140%);
     }
     .glass-strong { background: var(--glass-strong); }
-    /* 카드 스포트라이트: 마우스 위치(--mx, --my)를 따라 은은한 빛이 비칩니다 */
-    .glass, .tile { background-image: radial-gradient(380px circle at var(--mx, -999px) var(--my, -999px), var(--spot), transparent 45%); }
+    /* 카드 스포트라이트: 마우스 위치(--mx, --my)를 따라 넓고 은은한 빛이 비칩니다. --sk는 빛의 세기(0~1, 서서히 켜지고 꺼짐) */
+    .glass, .tile { background-image: radial-gradient(560px circle at var(--mx, -999px) var(--my, -999px),
+      color-mix(in srgb, var(--spot) calc(var(--sk, 0) * 100%), transparent), transparent 62%); }
     /* 회전 테두리: 작전실 패널과 접속 창 테두리를 빛이 천천히 돕니다 */
     @property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
     #ops-panel, :root:not(:has(#my-notes:not([hidden]))) .gate-card { position: relative; }
@@ -305,7 +306,8 @@
     :root:not(:has(#my-notes:not([hidden]))) .gate-head h2 { font-size: 24px; }
     :root:not(:has(#my-notes:not([hidden]))) .gate-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; }
     :root:not(:has(#my-notes:not([hidden]))) .gate-note { display: block; margin: 0; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
-    .gate-steps li { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 10px; white-space: nowrap; border-radius: 999px; font-size: 13px; color: var(--ink-2);
+    /* 숫자 아이콘은 왼쪽 끝, 글자는 알약 전체 기준 가운데(오른쪽에 아이콘 폭만큼 빈 칸을 둬 균형) */
+    .gate-steps li { display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; gap: 6px; padding: 8px 12px; text-align: center; white-space: nowrap; border-radius: 999px; font-size: 13px; color: var(--ink-2);
       background: var(--ghost); }
     :root:not(:has(#session-info:not([hidden]))) .gate-steps [data-gate="1"],
     :root:has(#session-info:not([hidden])) .gate-steps [data-gate="2"] { color: var(--pill-ink); background: var(--pill); }
@@ -1137,20 +1139,44 @@
       opsVisual.replaceChildren(chips, engage, el('div', { class: 'trio' }, gateCard, devCard, restoreCard), rulesList);
     }
 
-    // 카드 스포트라이트: 마우스가 올라간 카드에만 빛 위치를 넘깁니다(장식만).
-    let litCard = null;
-    document.addEventListener('pointermove', event => {
-      const card = event.target.closest?.('.glass, .tile') ?? null;
-      if (card !== litCard) {
-        litCard?.style.removeProperty('--mx');
-        litCard?.style.removeProperty('--my');
-        litCard = card;
+    // 카드 스포트라이트: 빛이 마우스를 바로 따라붙지 않고 무게감 있게 천천히 미끄러져 오며,
+    // 카드에 들어오고 나갈 때는 서서히 밝아지고 사라집니다(장식만).
+    const calmMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const SPOT_FOLLOW = calmMotion ? 1 : 0.08;
+    const SPOT_FADE = calmMotion ? 1 : 0.06;
+    const spots = new Map(); // 카드 → { x, y, tx, ty, k, tk }
+    let spotFrame = 0;
+    function tickSpots() {
+      spotFrame = 0;
+      for (const [card, spot] of spots) {
+        spot.x += (spot.tx - spot.x) * SPOT_FOLLOW;
+        spot.y += (spot.ty - spot.y) * SPOT_FOLLOW;
+        spot.k += (spot.tk - spot.k) * SPOT_FADE;
+        if (spot.tk === 0 && spot.k < 0.01) {
+          for (const name of ['--mx', '--my', '--sk']) card.style.removeProperty(name);
+          spots.delete(card);
+          continue;
+        }
+        card.style.setProperty('--mx', `${spot.x.toFixed(1)}px`);
+        card.style.setProperty('--my', `${spot.y.toFixed(1)}px`);
+        card.style.setProperty('--sk', spot.k.toFixed(3));
       }
-      if (!card) return;
-      const box = card.getBoundingClientRect();
-      card.style.setProperty('--mx', `${event.clientX - box.left}px`);
-      card.style.setProperty('--my', `${event.clientY - box.top}px`);
-    });
+      if (spots.size) spotFrame = requestAnimationFrame(tickSpots);
+    }
+    function aimSpot(card, event) {
+      for (const [other, spot] of spots) if (other !== card) spot.tk = 0;
+      if (card) {
+        const box = card.getBoundingClientRect();
+        const x = event.clientX - box.left;
+        const y = event.clientY - box.top;
+        const spot = spots.get(card) ?? { x, y, k: 0 };
+        Object.assign(spot, { tx: x, ty: y, tk: 1 });
+        spots.set(card, spot);
+      }
+      if (!spotFrame && spots.size) spotFrame = requestAnimationFrame(tickSpots);
+    }
+    document.addEventListener('pointermove', event => aimSpot(event.target.closest?.('.glass, .tile') ?? null, event));
+    document.documentElement.addEventListener('pointerleave', event => aimSpot(null, event));
 
     // 그래프 위 마우스 설명(데이터는 위 그림과 같은 값)
     const vizTip = document.getElementById('viz-tip');
