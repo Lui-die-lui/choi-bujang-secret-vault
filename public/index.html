@@ -177,8 +177,17 @@
     .steps li::before { content: ""; position: absolute; width: 140px; height: 140px; right: -40px; top: -60px; border-radius: 50%;
       background: radial-gradient(circle, var(--glow, transparent), transparent 70%); }
     .steps b { font-size: 18px; font-weight: 500; }
-    .steps .n { position: absolute; right: 16px; bottom: 14px; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
-      font-size: 12px; color: var(--ink-2); background: var(--glass-strong); border: 1px solid var(--glass-border); }
+    .steps .n { position: absolute; right: 14px; bottom: 12px; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
+      color: var(--ink-2); background: var(--glass-strong); border: 1px solid var(--glass-border); transition: background .45s, color .45s; }
+    .steps .n .step-ico svg { width: 26px; height: 26px; }
+    /* 단계 아이콘: 숫자 원(TbCircleNumber), 끝난 단계는 확인 원(TbCircleCheck) */
+    .step-ico { display: inline-grid; place-items: center; flex: none; }
+    .step-ico svg { grid-area: 1 / 1; width: 20px; height: 20px; transition: opacity .35s, transform .35s; }
+    .step-ico .i-done { opacity: 0; transform: scale(.6); }
+    body:has(#session-info:not([hidden])) [data-step="1"] .i-num, body:has(#session-info:not([hidden])) [data-gate="1"] .i-num,
+    body:has(#my-notes:not([hidden])) [data-step="2"] .i-num, body:has(#my-notes:not([hidden])) [data-step="3"] .i-num { opacity: 0; transform: scale(.6); }
+    body:has(#session-info:not([hidden])) [data-step="1"] .i-done, body:has(#session-info:not([hidden])) [data-gate="1"] .i-done,
+    body:has(#my-notes:not([hidden])) [data-step="2"] .i-done, body:has(#my-notes:not([hidden])) [data-step="3"] .i-done { opacity: 1; transform: none; }
     body:has(#session-info:not([hidden])) .steps [data-step="1"] .n,
     body:has(#my-notes:not([hidden])) .steps [data-step="2"] .n,
     body:has(#my-notes:not([hidden])) .steps [data-step="3"] .n { background: var(--pill); color: var(--pill-ink); border-color: transparent; }
@@ -246,11 +255,15 @@
     #auth:has(#session-info:not([hidden])) h3 { display: none; }
     #auth:has(#session-info:not([hidden])) #session-info { margin-top: 0; }
     :root:not(:has(#my-notes:not([hidden]))) body { overflow: hidden; }
+    /* 잠긴 동안에는 흐림에만 기대지 않고 접속 창을 뺀 화면 요소를 아예 그리지 않습니다.
+       새로고침·전환·흐림 재계산 중에도 뒤 화면이 비치지 않도록, 막은 처음부터 불투명하게 둡니다(서서히 나타나는 효과 없음). */
+    :root:not(:has(#my-notes:not([hidden]))) .app { visibility: hidden; }
+    :root:not(:has(#my-notes:not([hidden]))) .gate,
+    :root:not(:has(#my-notes:not([hidden]))) #offline-notice { visibility: visible; }
     :root:not(:has(#my-notes:not([hidden]))) .gate {
       position: fixed; inset: 0; z-index: 40; display: grid; justify-items: center; align-content: safe center; padding: 20px; overflow-y: auto;
-      background: color-mix(in srgb, var(--glass-solid) 35%, transparent);
+      background: color-mix(in srgb, var(--glass-solid) 55%, transparent);
       -webkit-backdrop-filter: blur(22px) saturate(120%); backdrop-filter: blur(22px) saturate(120%);
-      animation: gate-in .45s ease-out;
     }
     :root:not(:has(#my-notes:not([hidden]))) .gate-card {
       width: min(540px, 100%); padding: 30px 28px 24px; border-radius: 32px; background: var(--glass-strong); border: 1px solid var(--glass-border);
@@ -265,16 +278,12 @@
     :root:not(:has(#my-notes:not([hidden]))) .gate-note { display: block; margin: 0; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
     .gate-steps li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 999px; font-size: 13px; color: var(--ink-2);
       background: var(--ghost); }
-    .gate-steps span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 10.5px; border: 1px solid var(--hair-strong); }
     :root:not(:has(#session-info:not([hidden]))) .gate-steps [data-gate="1"],
     :root:has(#session-info:not([hidden])) .gate-steps [data-gate="2"] { color: var(--pill-ink); background: var(--pill); }
-    :root:not(:has(#session-info:not([hidden]))) .gate-steps [data-gate="1"] span,
-    :root:has(#session-info:not([hidden])) .gate-steps [data-gate="2"] span { border-color: currentColor; }
     :root:has(#session-info:not([hidden])) .gate-steps [data-gate="1"] { color: var(--ink-0); }
-    :root:has(#session-info:not([hidden])) .gate-steps [data-gate="1"] span { background: var(--good-bg); border-color: transparent; }
+    :root:has(#session-info:not([hidden])) .gate-steps [data-gate="1"] .step-ico { color: var(--good-ink); }
     /* 인증이 끝나면 접속 창은 제자리(접속 관문)로 내려가고, 화면이 흐림에서 또렷하게 드러납니다 */
     :root:has(#my-notes:not([hidden])) .canvas { animation: reveal .7s cubic-bezier(.2, .8, .2, 1); }
-    @keyframes gate-in { from { opacity: 0; } to { opacity: 1; } }
     @keyframes reveal { from { opacity: .3; filter: blur(12px); transform: translateY(24px); } to { opacity: 1; filter: none; transform: none; } }
     #offline-notice { position: relative; z-index: 45; }
 
@@ -295,7 +304,6 @@
     .gate-steps li:nth-child(2) { animation-delay: .05s; }
     .gate-steps li:nth-child(3) { animation-delay: .1s; }
     .gate-steps li { transition: background .45s, color .45s; }
-    .card-flow > li { animation: rise .5s cubic-bezier(.2, .8, .2, 1) both; }
 
     /* ---------- 작전실 ---------- */
     #ops-panel { padding: 26px; display: grid; gap: 20px; }
@@ -388,13 +396,32 @@
     .block-title { display: flex; align-items: baseline; gap: 12px; margin: 0 4px; }
     .block-title h2, .block-title h3 { font-size: 18px; }
     /* 메모 카드: 높이가 다른 카드를 여러 단에 빈틈 없이 채웁니다 */
-    .card-flow { list-style: none; margin: 0; padding: 0; columns: 280px 3; column-gap: 14px; }
-    .card-flow > li { break-inside: avoid; margin: 0 0 14px; }
+    /* 메모 카드: 왼쪽부터 가로 순서(1·2·3이 첫 줄)로 놓고, 다음 카드는 가장 먼저 비는 단 아래로 이어집니다.
+       줄 높이를 2px로 잘게 나누고 각 카드가 자기 높이만큼만 줄을 차지하게 해서(스크립트가 계산) 빈틈이 생기지 않습니다. */
+    .card-flow { list-style: none; margin: 0; padding: 0; display: grid; column-gap: 14px; grid-auto-rows: 2px; align-items: start;
+      grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - 28px) / 3)), 1fr)); }
+    .card-flow:empty { display: block; }
+    .card-flow > li { margin: 0; }
     #my-notes-list:empty::before { content: "아직 메모가 없습니다. 위에서 첫 메모를 추가해 보세요."; display: block; padding: 28px; text-align: center;
       color: var(--ink-2); border: 1px dashed var(--hair-strong); border-radius: 22px; }
-    .composer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto; gap: 12px 14px; align-items: end; padding: 18px 20px; border-radius: 26px; }
-    .composer textarea { min-height: 48px; height: 48px; resize: vertical; }
-    .composer .auth-error { grid-column: 1 / -1; margin: 0; }
+    .block-title:has(.compose-btn) { align-items: center; }
+    .compose-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px 11px 14px; }
+    .compose-btn svg { width: 17px; height: 17px; }
+    /* 작성 모달: 바탕을 흐리게 덮고, 창은 아래에서 떠오릅니다 */
+    .compose-dialog {
+      width: min(560px, calc(100% - 32px)); max-height: calc(100vh - 48px); padding: 0; border-radius: 30px; color: var(--ink-0);
+      background: var(--glass-solid); border: 1px solid var(--glass-border); box-shadow: 0 40px 90px -30px #00000080, 0 2px 8px #00000014;
+      -webkit-backdrop-filter: blur(30px) saturate(150%); backdrop-filter: blur(30px) saturate(150%);
+    }
+    .compose-dialog[open] { animation: rise .5s cubic-bezier(.2, .8, .2, 1) both; }
+    .compose-dialog::backdrop { background: #0a162040; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: fade-in .35s ease-out; }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .composer { display: grid; gap: 14px; padding: 24px; }
+    .composer textarea { min-height: 170px; }
+    .composer .auth-error { margin: 0; }
+    .compose-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
+    .compose-head h3 { font-size: 22px; }
+    .compose-actions { display: flex; justify-content: flex-end; gap: 8px; }
     #my-notes-list li { display: grid; gap: 10px; background: var(--glass-strong); }
     #my-notes-list li > span { white-space: pre-wrap; }
     #my-notes-list .note-actions { display: flex; gap: 8px; justify-content: flex-end; }
@@ -429,8 +456,8 @@
     @media (max-width: 640px) {
       .steps { grid-template-columns: minmax(0, 1fr); }
       .steps li { min-height: 0; }
-      .auth-fields, .rules, .composer { grid-template-columns: minmax(0, 1fr); }
-      .composer button { justify-self: end; }
+      .auth-fields, .rules { grid-template-columns: minmax(0, 1fr); }
+      .composer { padding: 20px; }
       .callout { position: static; margin-top: 8px; }
       .panel, #ops-panel, .engage, .card { padding: 18px; }
       .live-pill [data-when] { font-size: 12.5px; }
@@ -478,9 +505,9 @@
       <p class="lede" data-view-panel="home">아래 기록은 모두 실습을 위해 만든 가상 자료입니다. 자료는 서버가 로그인과 이 기기의 등록 여부를 확인한 뒤에만 열립니다.</p>
 
       <ol class="steps" data-view-panel="home" aria-label="자료실이 열리는 순서">
-        <li class="glass" data-step="1"><b>로그인</b><span class="sub-label">서버가 신원 확인</span><span class="n">01</span></li>
-        <li class="glass" data-step="2"><b>기기 승인</b><span class="sub-label">등록부의 승인 기기 확인</span><span class="n">02</span></li>
-        <li class="glass" data-step="3"><b>자료실 열림</b><span class="sub-label">작전실·메모 조회</span><span class="n">03</span></li>
+        <li class="glass" data-step="1"><b>로그인</b><span class="sub-label">서버가 신원 확인</span><span class="n"><span class="step-ico"><svg class="i-num" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 10l2 -2v8"/></svg><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg></span></span></li>
+        <li class="glass" data-step="2"><b>기기 승인</b><span class="sub-label">등록부의 승인 기기 확인</span><span class="n"><span class="step-ico"><svg class="i-num" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 8h3a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 0 -1 1v2a1 1 0 0 0 1 1h3"/></svg><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg></span></span></li>
+        <li class="glass" data-step="3"><b>자료실 열림</b><span class="sub-label">작전실·메모 조회</span><span class="n"><span class="step-ico"><svg class="i-num" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 9a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1"/></svg><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg></span></span></li>
       </ol>
 
       <section id="sec-access" data-view-panel="home" aria-labelledby="access-title">
@@ -494,9 +521,9 @@
                 <div><h2 id="gate-title">자료실 접속</h2><div class="sub-label">로그인한 뒤 이 기기의 승인을 확인하면 전체 화면이 열립니다</div></div>
               </div>
               <ol class="gate-steps" aria-label="접속 단계">
-                <li data-gate="1"><span>01</span>로그인</li>
-                <li data-gate="2"><span>02</span>기기 인증</li>
-                <li data-gate="3"><span>03</span>자료실 열림</li>
+                <li data-gate="1"><span class="step-ico"><svg class="i-num" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 10l2 -2v8"/></svg><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg></span>로그인</li>
+                <li data-gate="2"><span class="step-ico"><svg class="i-num" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 8h3a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 0 -1 1v2a1 1 0 0 0 1 1h3"/></svg><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg></span>기기 인증</li>
+                <li data-gate="3"><span class="step-ico"><svg class="i-num" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 9a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1"/></svg><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg></span>자료실 열림</li>
               </ol>
               <div class="auth panel glass" id="auth">
                 <h3>학생 로그인</h3>
@@ -570,17 +597,30 @@
             <ul id="notes" class="card-flow" aria-live="polite"></ul>
           </div>
           <div class="my-notes" id="my-notes" hidden>
-            <div class="block-title"><h2>내 메모</h2><span class="sub-label">본인 메모만 읽고 고칩니다</span></div>
-            <form id="create-note-form" class="composer glass">
-              <label class="c-title">제목
-                <input type="text" id="new-note-title" required>
-              </label>
-              <label class="c-body">내용
-                <textarea id="new-note-body" required></textarea>
-              </label>
-              <button type="submit">메모 추가</button>
-              <p class="auth-error" id="create-note-error" role="alert"></p>
-            </form>
+            <div class="block-title"><h2>내 메모</h2><span class="sub-label">본인 메모만 읽고 고칩니다</span>
+              <button type="button" class="compose-btn" id="compose-open">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>작성하기</button>
+            </div>
+            <dialog class="compose-dialog" id="compose-dialog" aria-labelledby="compose-title">
+              <form id="create-note-form" class="composer">
+                <div class="compose-head">
+                  <div><h3 id="compose-title">새 메모</h3><div class="sub-label">본인 계정에만 저장됩니다</div></div>
+                  <button type="button" class="icon-btn" id="compose-close" aria-label="작성 창 닫기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+                </div>
+                <label>제목
+                  <input type="text" id="new-note-title" required>
+                </label>
+                <label>내용
+                  <textarea id="new-note-body" required></textarea>
+                </label>
+                <p class="auth-error" id="create-note-error" role="alert"></p>
+                <div class="compose-actions">
+                  <button type="button" class="btn-ghost" id="compose-cancel">취소</button>
+                  <button type="submit">메모 추가</button>
+                </div>
+              </form>
+            </dialog>
             <ul id="my-notes-list" class="card-flow" aria-live="polite"></ul>
           </div>
         </div>
@@ -1115,6 +1155,43 @@
       vaultWasOpen = open;
     }).observe(myNotesSection, { attributes: true, attributeFilter: ['hidden'] });
     go('home');
+
+    // 메모 카드 배치: 각 카드가 자기 높이만큼 줄을 차지하게 해서 가로 순서를 지키며 빈틈 없이 쌓습니다.
+    // 목록이 새로 그려질 때 새로 늘어난 카드에만 떠오르는 효과를 줍니다(내용·순서는 기존 코드가 정함).
+    const CARD_ROW = 2;
+    const CARD_GAP = 14;
+    const placeCard = card => {
+      card.style.gridRowEnd = `span ${Math.ceil((card.getBoundingClientRect().height + CARD_GAP) / CARD_ROW)}`;
+    };
+    const cardSizes = new ResizeObserver(entries => entries.forEach(entry => placeCard(entry.target)));
+    for (const cardList of document.querySelectorAll('.card-flow')) {
+      let shown = 0;
+      new MutationObserver(() => {
+        const cards = [...cardList.children];
+        cards.forEach((card, index) => {
+          if (index >= shown && shown > 0) card.classList.add('rise');
+          placeCard(card);
+          cardSizes.observe(card);
+        });
+        shown = cards.length;
+      }).observe(cardList, { childList: true });
+    }
+
+    // 메모 작성 모달: 창을 열고 닫기만 합니다. 저장 요청은 기존 #create-note-form 제출 코드가 그대로 처리하고,
+    // 저장에 성공하면 그 코드가 양식을 비우므로(reset) 그때 창을 닫습니다. 실패하면 창에 오류 문구가 남습니다.
+    const composeDialog = document.getElementById('compose-dialog');
+    document.getElementById('compose-open').addEventListener('click', () => {
+      createNoteError.textContent = '';
+      composeDialog.showModal();
+      document.getElementById('new-note-title').focus();
+    });
+    for (const id of ['compose-close', 'compose-cancel']) {
+      document.getElementById(id).addEventListener('click', () => composeDialog.close());
+    }
+    composeDialog.addEventListener('click', event => { if (event.target === composeDialog) composeDialog.close(); });
+    createNoteForm.addEventListener('reset', () => composeDialog.close());
+    new MutationObserver(() => { if (myNotesSection.hidden && composeDialog.open) composeDialog.close(); })
+      .observe(myNotesSection, { attributes: true, attributeFilter: ['hidden'] });
 
     // 기기 상태 문구가 바뀌면 그 문구만 다시 떠오르게 합니다(문구 내용은 기존 코드가 정함).
     new MutationObserver(() => {
