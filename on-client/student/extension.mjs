@@ -1,12 +1,16 @@
 // 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
-const MODE_LABELS = { demo: '예제 자료', disconnected: '연결 없음', unknown: '확인 불가' };
+const MODE_LABELS = { connected: '연결됨', demo: '예제 자료', disconnected: '연결 없음', unknown: '확인 불가' };
 const DEVICE_LABELS = { compliant: '보안 기준 충족', noncompliant: '보안 기준 미충족', unknown: '확인 불가' };
 const SESSION_LABELS = { active: '활성', expired: '만료', revoked: '철회됨', unknown: '확인 불가' };
 
 function modeLabel(mode) {
-  if (Object.hasOwn(MODE_LABELS, mode)) return MODE_LABELS[mode];
-  return mode === 'live' ? null : MODE_LABELS.unknown;
+  return Object.hasOwn(MODE_LABELS, mode) ? MODE_LABELS[mode] : MODE_LABELS.unknown;
+}
+
+// 한국어 상태 옆에 전달받은 원래 status 값을 함께 보여 준다. 값이 없으면 "(값 없음)".
+function withRaw(label, raw) {
+  return `${label} (${typeof raw === 'string' && raw ? raw : '값 없음'})`;
 }
 
 function lookup(labels, value) {
@@ -51,13 +55,13 @@ function section(title, resource, buildOk) {
 function deviceRow(device) {
   const label = typeof device?.label === 'string' ? device.label : '확인 불가';
   const id = typeof device?.id === 'string' ? device.id : '확인 불가';
-  const state = lookup(DEVICE_LABELS, device?.status);
+  const state = withRaw(lookup(DEVICE_LABELS, device?.status), device?.status);
   return row(`기기 ${label} (${id})`, state, device?.status !== 'compliant');
 }
 
 function sessionRow(session) {
   const id = typeof session?.id === 'string' ? session.id : '확인 불가';
-  return row(`세션 ${id}`, lookup(SESSION_LABELS, session?.status), session?.status !== 'active');
+  return row(`세션 ${id}`, withRaw(lookup(SESSION_LABELS, session?.status), session?.status), session?.status !== 'active');
 }
 
 export function createStudentView() {
