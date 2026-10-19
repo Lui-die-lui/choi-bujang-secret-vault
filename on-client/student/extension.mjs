@@ -2,7 +2,8 @@
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
 const MODE_LABELS = { connected: '연결됨', demo: '예제 자료', disconnected: '연결 없음', unknown: '확인 불가' };
 const DEVICE_LABELS = { compliant: '보안 기준 충족', noncompliant: '보안 기준 미충족', unknown: '확인 불가' };
-const SESSION_LABELS = { active: '활성', expired: '만료', revoked: '철회됨', unknown: '확인 불가' };
+const DECISION_LABELS = { allow: '접근 허용', deny: '접근 거부', challenge: '추가 확인 필요', unknown: '확인 불가' };
+const SESSION_LABELS ={ active: '활성', expired: '만료', revoked: '철회됨', unknown: '확인 불가' };
 
 function modeLabel(mode) {
   return Object.hasOwn(MODE_LABELS, mode) ? MODE_LABELS[mode] : MODE_LABELS.unknown;
@@ -89,7 +90,42 @@ export function createStudentView() {
       );
       return root;
     },
-    renderDecision() { return '학생 구현 대기: 서버의 판정과 이유를 연결하세요.'; },
+    // 요청 전·중·후·실패를 구분하고, 요청 실패는 접근 거부 판정과 다르게 보여 준다.
+    renderDecision({ status, mode, data, error, appId } = {}) {
+      const root = document.createElement('div');
+      root.className = 'student-decision';
+      if (typeof appId === 'string' && appId) root.append(row('업무 앱', appId));
+
+      if (status === 'idle') {
+        root.append(text('p', '앱을 골라 접속을 요청하세요'));
+        return root;
+      }
+      root.append(text('p', `자료 출처: ${modeLabel(mode)}`, 'identity-mode'));
+
+      if (status === 'loading') {
+        root.append(text('p', '판정 확인 중'));
+      } else if (status === 'error') {
+        const message = error?.message;
+        root.append(
+          text('p', `요청 실패: ${typeof message === 'string' && message ? message : '확인 불가'}`, 'identity-warn'),
+          text('p', '요청이 실패한 것이며 접근 거부 판정이 아닙니다. 판정을 받지 못했습니다.'),
+        );
+      } else if (status === 'ok' && data != null) {
+        const raw = typeof data.decision === 'string' ? data.decision : '';
+        const known = Object.hasOwn(DECISION_LABELS, raw) && raw !== 'unknown';
+        const label = known ? DECISION_LABELS[raw] : DECISION_LABELS.unknown;
+        root.append(row('접근 판정', withRaw(label, known ? raw : 'unknown'), raw !== 'allow'));
+        if (raw === 'challenge') root.append(text('p', '추가 인증 또는 확인이 필요합니다. 이 앱이 확인 절차를 대신 수행하지 않습니다.'));
+        if (!known) root.append(text('p', '접근이 허용되지 않은 것으로 처리합니다. 판정을 확인할 수 없습니다.', 'identity-warn'));
+        root.append(
+          row('판정 이유', typeof data.reason === 'string' && data.reason ? data.reason : '확인 불가'),
+          row('판정 시각', typeof data.checkedAt === 'string' && data.checkedAt ? data.checkedAt : '확인 불가'),
+        );
+      } else {
+        root.append(text('p', '확인 불가: 판정 결과를 받지 못했습니다. 접근이 허용된 것이 아닙니다.', 'identity-warn'));
+      }
+      return root;
+    },
     renderEvents() { return '학생 구현 대기: 본인 접속·XDR 기록을 연결하세요.'; },
     renderStatus() { return '학생 구현 대기: 기기·세션·알림과 연결 점검 상태를 구분하세요.'; },
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
