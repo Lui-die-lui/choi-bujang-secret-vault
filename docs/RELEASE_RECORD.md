@@ -19,7 +19,7 @@
 | 항목 | 내용 |
 |---|---|
 | OS | Windows 11 Home |
-| Node.js / npm | v22.20.0 / 10.9.3 (수업 기준 24.19.0은 **미확인**) |
+| Node.js / npm | v22.20.0 / 10.9.3 (수업 기준 24.19.0은 **미검증**, 4장 참고) |
 | 새 폴더 | 원래 작업 폴더 밖의 임시 폴더에 새로 만든 빈 폴더 |
 | 의존성 설치 | 하지 않음. `on-client`는 외부 npm 의존성이 없음 |
 | 인증·설정 파일 | 원래 폴더의 `.env` 등을 복사하지 않음 |
@@ -64,7 +64,17 @@
 ## 4. 버전과 지원 범위
 
 - **상태: 검증 중인 버전입니다.** v1.0이 아니며 실제 운영 인증이 아닙니다. 22단계 통과는 원문 검토 기준의 수료이며 실제 동작 증명이 아닙니다.
-- 지원 환경: Windows 11, Node.js v22.20.0에서 서버 시작과 `GET /`을 확인했습니다. 그 밖의 OS·Node 버전·브라우저는 지원 여부를 확인하지 않았습니다.
+- **Node.js 기준을 하나로 정리합니다.**
+
+| 구분 | 버전 | 근거 |
+|---|---|---|
+| 수업 기준·권장 | 24.19.0 | `on-client/package.json`의 `engines.node`. 실행 도구는 24.19.0이 아니면 "참고" 문구만 출력 |
+| 실행 허용 범위 | 22~24 | `on-client/tools/start-alekov.ps1`이 이 범위 밖이면 실행을 중단 |
+| 이 기록에서 실제 검증한 버전 | 22.20.0 | 2장의 재현(서버 시작, `GET /`, `GET /api/events`) |
+| 검증하지 않은 버전 | 24.19.0 및 그 밖의 모든 버전 | **미확인** |
+
+- 24.19.0은 **필수가 아니라 권장 기준**입니다. `engines.node`는 정확한 값으로 적혀 있지만 npm은 기본 설정에서 이를 강제하지 않습니다. 실행 도구는 22~24를 허용하며, 그중 22.20.0에서만 서버 시작을 실제로 확인했습니다. 따라서 "22.20.0에서 시작 확인, 22~24는 실행 도구가 허용하는 범위, 24.19.0은 수업 기준이며 미검증"으로 읽어야 합니다.
+- Windows 11 외 OS, 브라우저는 확인하지 않았습니다.
 - 기본 실행은 실제 접근 제어·XDR 시스템에 연결되지 않은 상태(`disconnected`)입니다. `npm run demo`는 예제 자료이며 실제 연결이 아닙니다.
 
 ## 5. 누락·미해결 사항
@@ -89,13 +99,53 @@
 
 ## 7. 데이터 보존 계획
 
-| 데이터 | 위치 | 보존·백업 | 복원 | 제한 |
-|---|---|---|---|---|
-| 학생 코드·문서 | Git 저장소(`assignment` 브랜치) | `git push`로 원격 보관 | `git clone`으로 같은 커밋 복원 | 커밋하지 않은 변경은 포함되지 않음 |
-| 1~12단계 자료실 데이터(가상 메모, 기기 등록부, 회수 기록) | Supabase | 이 저장소는 스키마 SQL(`docs/sql/`, `supabase/`)만 보관하며 데이터 백업은 하지 않음 | SQL을 순서대로 다시 실행하면 스키마만 복원됨 | 데이터 복원은 이 저장소 범위 밖, **미확인** |
-| 조치 접수 저장소 | `on-client/src/actions/store.mjs`가 설정된 경로의 SQLite 파일 사용 | 실제 경로와 내용은 확인하지 않음 | **미확인** | 이번 환경에서는 조치 설정이 없어 사용하지 않음 |
-| 키·토큰·`.env` | 로컬 파일, 서버 보관소 | Git에 넣지 않음. 별도 백업하지 않음 | 담당자가 다시 발급 | 학생이 값을 문서에 적지 않음 |
-| `bundle-notes.json`, `artifacts/submission.json` | 로컬 | 커밋하지 않음 | 해당 없음 | 제출 도구가 다시 만듦 |
+이 장은 **절차 설명**입니다. 이번 단계에서 아래 백업·복원 명령을 실행하지 않았고 결과도 확인하지 않았습니다. 데이터는 모두 수업용 가상 자료이며 실제 개인정보는 넣지 않습니다.
+
+### 7-1. 보존 대상과 범위
+
+| 구분 | 대상 | 위치 | 범위 |
+|---|---|---|---|
+| 코드·문서 | 학생 코드, 문서, SQL 스키마 | Git `assignment` 브랜치 | 포함 |
+| 가상 메모 | `t02_vault_notes`, `t03_personal_notes` | Supabase | 포함 |
+| 복구 사본·감사 | `t10_note_backups`, `t10_restore_audit` | Supabase | 포함 |
+| 기기·회수·접근 기록 | `t11_devices`, `t12_revoked_identities`, `t12_access_events` | Supabase | 포함 |
+| 탐지 보조 표 | `xdr_brute_force_blocklist`, `xdr_brute_force_failures` | Supabase | 선택 |
+| 조치 접수 기록 | 운영자가 설정한 경로의 SQLite 파일 | 운영자 호스트 설정 | 7-4 참고 |
+| 비밀값 | `.env`, 키, 토큰, 기기 개인키 | 로컬·서버 보관소 | **백업 대상 아님**: Git·백업 파일·문서에 넣지 않고 담당자가 재발급 |
+
+### 7-2. 백업 절차 (Supabase)
+
+1. 백업 전 앱 사용을 멈춥니다(쓰기가 없는 상태에서 일관된 사본을 받기 위함).
+2. 선택 A: Supabase 대시보드의 Database → Backups에서 제공되는 백업을 확인합니다(제공 여부는 요금제에 따르며 **미확인**).
+3. 선택 B: 표 단위 내보내기. 연결 문자열은 Supabase 대시보드에서 받아 환경변수 `DATABASE_URL`에만 넣고 파일·Git·답변에 적지 않습니다.
+
+```powershell
+pg_dump --data-only --no-owner --table=public.t02_vault_notes --table=public.t03_personal_notes --table=public.t10_note_backups --table=public.t10_restore_audit --table=public.t11_devices --table=public.t12_revoked_identities --table=public.t12_access_events --file=..\백업\keshev-data-날짜.sql $env:DATABASE_URL
+```
+
+4. 백업 파일은 **저장소 밖**의 폴더에 둡니다. `t03_personal_notes`·`t10_note_backups`에는 메모 본문이 있으므로 Git에 커밋하지 않고 접근을 제한합니다.
+5. 파일 이름에 날짜를 넣고, 마지막 백업 시각을 저장소 밖의 개인 기록에 남깁니다.
+
+### 7-3. 복원 절차 (Supabase)
+
+1. 새 Supabase 프로젝트(또는 비운 프로젝트)에 `README.md`의 순서대로 스키마 SQL을 실행합니다: `supabase/notes_seed.local.sql`, `supabase/personal_notes.local.sql`, `supabase/personal_notes_rls.local.sql`, `supabase/t03_revoke_direct.local.sql`, `docs/sql/t10_note_backups.sql`, `docs/sql/t10_restore_audit.sql`, `docs/sql/t11_devices.sql`, `docs/sql/t12_ops.sql`.
+2. 시드 SQL이 이미 넣은 행과 백업의 행이 겹칠 수 있으므로, 복원 전에 해당 표가 비어 있는지 확인합니다.
+3. 백업 파일을 `psql $env:DATABASE_URL -f <백업 파일>`로 적용합니다.
+4. 복원 뒤 확인: 각 표의 행 수가 백업 시점과 같은지, **`t12_revoked_identities`(회수된 신원)가 반드시 복원되었는지**를 먼저 봅니다. 회수 기록이 빠진 채 앱을 열면 회수된 신원이 다시 열릴 수 있으므로, 확인 전에는 앱을 열지 않습니다.
+5. 메모 한 건 단위 복구(`GET/POST /api/note-restore/:id`)는 `t10_note_backups`의 사본을 읽으므로, 이 표를 먼저 복원해야 동작합니다.
+
+### 7-4. 조치 접수 SQLite
+
+- 파일 경로는 운영자 호스트 설정(`databasePath`)이 정하며, 이미 존재하는 SQLite 파일이어야 합니다(`on-client/src/actions/action-startup-config.mjs`는 자동 생성·이전을 하지 않음). 학생이 경로를 정하거나 바꾸지 않습니다.
+- 이번 환경에서는 조치 설정이 없어 이 파일을 사용하지 않았고, 실제 경로·내용은 **미확인**입니다.
+- 설정이 있는 환경에서의 절차: 앱을 종료한 뒤 그 파일을 저장소 밖에 복사해 백업하고, 복원은 앱을 종료한 상태에서 같은 경로의 파일을 백업본으로 교체합니다. 헤더가 SQLite 형식이 아니거나 링크이면 설정 검사가 거부합니다.
+- 제한: 접수 기록을 복원해도 이미 연동 시스템에 전달된 조치의 효과는 되돌려지지 않으므로, 결과는 재조회로만 확인합니다.
+
+### 7-5. 제한
+
+- 백업 시점 이후의 변경은 복원되지 않습니다. 자동 백업 일정은 만들지 않았습니다.
+- 위 명령과 Supabase 백업 기능은 이번에 실행하지 않았으므로 동작 여부는 **미확인**입니다.
+- 서버가 이 계획을 실행하거나 검증하지 않습니다.
 
 ## 8. 구분 요약
 

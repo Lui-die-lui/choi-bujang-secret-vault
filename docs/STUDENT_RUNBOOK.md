@@ -9,10 +9,11 @@
 | OS | Windows 11 Home | 실제 사용 환경 |
 | Node.js | 이 PC는 v22.20.0 (`node -v`) | 실제 실행으로 확인 |
 | npm | 10.9.3 (`npm -v`) | 실제 실행으로 확인 |
-| `on-client/package.json`의 `engines.node` | 24.19.0 (수업 검수 기준) | 파일 내용 |
+| `on-client/package.json`의 `engines.node` | 24.19.0 (수업 기준·권장, 필수 아님) | 파일 내용 |
+| 실행 도구가 허용하는 범위 | Node.js 22~24 (`tools/start-alekov.ps1`) | 파일 내용 |
 | 외부 npm 의존성 | 없음 (`on-client/package.json`에 dependencies 없음) | 파일 내용 |
 
-- 이 PC의 Node.js 22.20.0에서 서버가 켜지고 `GET /` 응답 200을 받은 것까지 확인했습니다. Node.js 24.19.0에서는 실행하지 않았으므로 **미확인**입니다.
+- 이 PC의 Node.js 22.20.0에서 서버가 켜지고 `GET /` 응답 200을 받은 것까지 확인했습니다. 검증한 버전은 22.20.0뿐이며 24.19.0은 실행하지 않아 **미검증**입니다. 기준 정리는 `docs/RELEASE_RECORD.md` 4장을 따릅니다.
 - Windows 외 OS, 다른 브라우저는 확인하지 않았습니다. 지원 여부는 **미확인**입니다.
 
 ## 2. 폴더 구조
