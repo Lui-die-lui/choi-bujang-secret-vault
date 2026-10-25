@@ -480,23 +480,88 @@ export function createStudentView() {
         const code = typeof explanation.error?.code === 'string' && explanation.error.code ? explanation.error.code : '확인 불가';
         const message = typeof explanation.error?.message === 'string' && explanation.error.message ? explanation.error.message : '확인 불가';
         root.append(
-          text('p', 'AI 설명을 받지 못했습니다', 'identity-warn'),
+          text('p', 'AI 설명 실패: 설명을 받지 못했습니다', 'identity-warn'),
           row('오류 코드', code, true),
           row('오류 메시지', message, true),
-          text('p', '기록은 그대로 유지됩니다. 다시 요청하려면 보안 기록에서 직접 요청하세요.'),
+          text('p', '기록은 그대로입니다. 설명 실패는 과제 실패가 아니며 업무 앱 판정과 기록 목록은 계속 동작합니다. 다시 요청하려면 보안 기록에서 직접 요청하세요.'),
         );
-      } else if (status === 'ok' && eventId && typeof explanation.data?.summary === 'string' && explanation.data.summary) {
-        root.dataset.studentExplanationEvent = eventId;
-        root.append(
-          row('사건 ID', eventId),
-          row('AI 설명 요약', explanation.data.summary),
-          row('설명 확인 시각', typeof checkedAt === 'string' && checkedAt ? checkedAt : '확인 불가'),
-          text('p', 'AI 설명은 참고용입니다. 사실 판단은 기록의 근거를 기준으로 하세요.'),
-        );
+      } else if (status === 'ok' && !eventId) {
+        root.append(text('p', '보안 기록에서 기록을 먼저 고르세요. 기록 없이는 AI 설명을 표시하지 않습니다.'));
       } else if (status === 'ok') {
-        root.append(text('p', '확인 불가: 설명 또는 사건 정보를 확인할 수 없어 표시하지 않습니다.', 'identity-warn'));
+        const data = explanation.data;
+        const evidence = Array.isArray(event.evidence) ? event.evidence : [];
+        const ids = Array.isArray(data?.evidenceIds) ? data.evidenceIds : null;
+        const proposals = Array.isArray(data?.proposals) ? data.proposals : null;
+        const cited = ids?.map((ref) => evidence.find((e) => e?.id === ref));
+        const proposalCited = proposals?.every((p) => Array.isArray(p?.evidenceIds)
+          && p.evidenceIds.every((ref) => evidence.some((e) => e?.id === ref)));
+        if (typeof data?.summary !== 'string' || !data.summary || !ids || !proposals) {
+          root.append(text('p', '확인 불가: 설명 형식이 계약과 달라 표시하지 않습니다.', 'identity-warn'));
+          return root;
+        }
+        if (data.executed !== false || data.requiresHumanConfirmation !== true) {
+          root.append(
+            text('p', 'AI 설명을 쓸 수 없습니다: 조치가 이미 실행됐다고 답했거나 사람 확인 조건이 빠져 있습니다.', 'identity-warn'),
+            text('p', '기록은 그대로 유지됩니다.'),
+          );
+          return root;
+        }
+        if (cited.some((e) => !e) || !proposalCited) {
+          root.append(
+            text('p', 'AI 설명을 쓸 수 없습니다: 인용한 근거 ID가 선택한 기록의 근거와 맞지 않습니다(근거 불일치).', 'identity-warn'),
+            text('p', '기록은 그대로 유지됩니다. 없는 근거를 추측해 맞추지 않습니다.'),
+          );
+          return root;
+        }
+
+        // 모든 검사를 통과한 설명에만 성공 표식을 붙인다.
+        root.dataset.studentExplanationEvent = eventId;
+        const state = event.state ?? {};
+        const unknownStates = [['access', '접속'], ['session', '세션'], ['device', '기기']]
+          .filter(([key]) => state[key] === 'unknown');
+        const rules = Array.isArray(event.rules) ? event.rules : [];
+        const supported = Array.isArray(event.supportedActions) ? event.supportedActions : [];
+
+        const evidenceList = document.createElement('ul');
+        cited.forEach((e) => evidenceList.append(text('li', `${e.id} — ${e.text ?? ''}`)));
+        if (cited.length === 0) evidenceList.append(text('li', '인용한 근거 없음'));
+        const ruleList = document.createElement('ul');
+        for (const r of rules) ruleList.append(text('li', `${r?.id ?? '확인 불가'} — ${r?.text ?? ''}`));
+        if (rules.length === 0) ruleList.append(text('li', '규칙 없음'));
+        const unknownList = document.createElement('ul');
+        for (const [, label] of unknownStates) unknownList.append(text('li', `${label}: 확인 불가(unknown)`));
+        if (unknownStates.length === 0) unknownList.append(text('li', '없음'));
+
+        root.append(
+          text('h4', 'AI 설명(참고용)'),
+          row('사건 ID', eventId),
+          row('AI 설명 요약', data.summary),
+          row('설명 확인 시각', typeof checkedAt === 'string' && checkedAt ? checkedAt : '확인 불가'),
+          text('p', 'AI 설명은 해석입니다. 사실 판단은 근거 글과 연동 시스템이 알려 준 상태로 하세요.'),
+          text('h5', '인용한 근거'),
+          evidenceList,
+          text('h5', '적용 규칙'),
+          ruleList,
+          text('h5', '확인 불가 상태'),
+          unknownList,
+          text('h5', '조치 제안'),
+        );
+        if (proposals.length === 0) {
+          root.append(text('p', supported.length === 0
+            ? '연동 시스템이 지원하는 조치가 없어 제안이 없습니다(정상).'
+            : 'AI가 이 기록에 대해 제안한 조치가 없습니다.'));
+        } else {
+          const list = document.createElement('ul');
+          for (const p of proposals) {
+            list.append(text('li', `${p.action} — ${p.reason ?? '이유 없음'} (근거 ${p.evidenceIds.join(', ') || '없음'}) · 사람 확인이 필요하며 실행되지 않았습니다.`));
+          }
+          root.append(list);
+        }
+        root.append(text('p', '설명과 제안만으로 보안 조치가 실행되지 않습니다.'));
       } else {
-        root.append(text('p', '사건을 선택해 AI 설명을 요청하면 여기에 표시됩니다. 연결 점검만으로는 설명이 실행되지 않습니다.'));
+        root.append(text('p', eventId
+          ? '사건을 선택해 AI 설명을 요청하면 여기에 표시됩니다. 연결 점검만으로는 설명이 실행되지 않습니다.'
+          : '보안 기록에서 기록을 먼저 고르세요. 연결 점검만으로는 설명이 실행되지 않습니다.'));
       }
       return root;
     },
