@@ -415,7 +415,85 @@ export function createStudentView() {
       root.append(help);
       return root;
     },
-    renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
+    // 호출마다 새 요소를 만들어 이전 표를 지운다. 조회 실패·미조회는 "취약점 없음"으로 보이지 않게 한다.
+    renderVulnerabilities({ status, mode, data, error } = {}) {
+      const root = document.createElement('div');
+      root.className = 'student-vulnerabilities';
+      const str = (v) => (typeof v === 'string' && v ? v : null);
+
+      if (status === 'idle') {
+        root.append(text('p', '조회 전: 설치 패키지 조회를 직접 실행하세요. 아직 취약점 여부를 확인하지 않았습니다.'));
+        return root;
+      }
+      root.append(text('p', `자료 출처: ${modeLabel(mode)}`, 'identity-mode'));
+      if (status === 'loading') {
+        root.append(text('p', '조회 중: 결과가 아직 없습니다. 이전 결과는 표시하지 않습니다.'));
+        return root;
+      }
+      if (status === 'error') {
+        root.append(
+          text('p', `조회 실패: ${str(error?.message) ?? '확인 불가'}`, 'identity-warn'),
+          row('오류 코드', str(error?.code) ?? '확인 불가', true),
+          text('p', '조회 실패는 취약점이 없다는 뜻이 아닙니다. 이전 결과를 현재 결과로 보지 않습니다. 다시 조회하려면 직접 실행하세요.'),
+        );
+        return root;
+      }
+      if (status !== 'ok' || data == null || typeof data !== 'object') {
+        root.append(text('p', '확인 불가: 조회 상태를 알 수 없습니다. 취약점이 없다는 뜻이 아닙니다.', 'identity-warn'));
+        return root;
+      }
+
+      const SCAN_LABELS = {
+        complete: '모두 조회(complete)',
+        partial: '일부 조회 실패(partial): 조회에 실패한 패키지는 취약점 없음이 아닙니다.',
+        not_checked: '아직 조회 안 함(not_checked): 승인된 공개 조회 대상이 없어 조회하지 않았습니다.',
+        not_configured: '조회 준비 미완료(not_configured): 조회 대상 프로젝트 설정이 필요합니다. 담당자가 준비합니다.',
+        unverifiable: 'lock 파일 확인 불가(unverifiable)',
+      };
+      const scanKnown = typeof data.status === 'string' && Object.hasOwn(SCAN_LABELS, data.status);
+      root.append(row('전체 조회 상태', scanKnown ? SCAN_LABELS[data.status] : `확인 불가(${str(data.status) ?? '값 없음'})`, data.status !== 'complete'));
+      if (data.lockfileVersion !== undefined) root.append(row('lockfileVersion', String(data.lockfileVersion)));
+      if (str(data.lockfileHash)) root.append(row('lockfileHash', data.lockfileHash));
+      if (str(data.checkedAt)) root.append(row('조회 시각(checkedAt)', data.checkedAt));
+      root.append(text('p', '이 결과는 package-lock.json과 설치된 node_modules의 정확한 버전을 OSV(알려진 취약점 데이터베이스)와 대조한 것입니다. 조회 범위에서 알려진 항목이 없다는 뜻이며 안전을 보장하지 않습니다.'));
+
+      const packages = Array.isArray(data.packages) ? data.packages : [];
+      if (packages.length === 0) {
+        root.append(text('p', data.status === 'complete' ? '조회한 패키지가 없습니다.' : '표시할 패키지 조회 결과가 없습니다. 취약점이 없다는 뜻이 아닙니다.'));
+        return root;
+      }
+      const PKG_LABELS = { known_vulnerabilities: '알려진 항목 있음', none_found: '알려진 항목 없음(조회 범위 기준)', unverifiable: '조회 확인 불가' };
+      const list = document.createElement('ul');
+      list.className = 'student-vulnerabilities-list';
+      for (const pkg of packages) {
+        const item = document.createElement('li');
+        const name = str(pkg?.name) ?? '확인 불가';
+        const version = str(pkg?.version) ?? '확인 불가';
+        item.dataset.studentPackageName = name;
+        item.dataset.studentPackageVersion = version;
+        const vulns = Array.isArray(pkg?.vulnerabilities) ? pkg.vulnerabilities : [];
+        const raw = str(pkg?.status);
+        const partialIds = raw === 'unverifiable' && vulns.length > 0;
+        const label = partialIds ? '일부 확인·전체 조회 확인 불가'
+          : (raw && Object.hasOwn(PKG_LABELS, raw) ? PKG_LABELS[raw] : '확인 불가');
+        item.append(
+          text('strong', `${name}@${version}`),
+          row('조회 결과', `${label} (${raw ?? '값 없음'})`, raw !== 'none_found'),
+          row('출처', str(pkg?.source) ?? '확인 불가'),
+          row('조회 시각', str(pkg?.checkedAt) ?? '확인 불가'),
+        );
+        if (vulns.length > 0) {
+          const ids = document.createElement('ul');
+          for (const v of vulns) ids.append(text('li', `${str(v?.id) ?? '확인 불가'} · modified: ${str(v?.modified) ?? '확인 불가'}`));
+          item.append(ids);
+        } else if (raw === 'unverifiable') {
+          item.append(text('p', '조회에 실패했습니다. 취약점이 없다는 뜻이 아닙니다.', 'identity-warn'));
+        }
+        list.append(item);
+      }
+      root.append(list);
+      return root;
+    },
     // 호출마다 새 요소를 만들어 이전 점검 결과·오류 안내를 지운다. 자동 재점검은 없다.
     renderAiConnection({ status, mode, data, error, checkedAt } = {}) {
       const root = document.createElement('div');
