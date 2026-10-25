@@ -565,6 +565,97 @@ export function createStudentView() {
       }
       return root;
     },
-    renderAction() { return '학생 구현 대기: 현재 사건·조치·실제 대상·사람 확인·ACK와 원천 효과·unknown을 구분하세요.'; },
+    // 호출마다 새 요소를 만들어 이전 대상·요청·결과를 지운다. 버튼·요청·확인 번호는 만들지 않는다.
+    renderAction({ status, event, actionId, target, receipt, observation, message, confirmationExpiresAt, error } = {}) {
+      const root = document.createElement('div');
+      root.className = 'student-action';
+      const str = (v) => (typeof v === 'string' && v ? v : null);
+      const eventId = str(event?.id);
+      const requestId = str(receipt?.requestId);
+      root.dataset.studentActionState = str(status) ?? 'unknown';
+
+      const known = ['idle', 'loading', 'prepared', 'executing', 'pending', 'succeeded', 'denied', 'failed', 'unknown', 'error', 'expired'];
+      if (!known.includes(status)) {
+        root.append(text('p', `확인 불가: 조치 상태를 알 수 없습니다(${str(status) ?? '값 없음'}). 성공으로 보지 않습니다.`, 'identity-warn'));
+        return root;
+      }
+      if (status === 'idle') {
+        root.append(
+          text('p', '아직 미실행(idle): 조치 제안·확인·전달이 없었습니다.'),
+          text('p', '조치 준비 버튼이 보이지 않는 것은 정상입니다. 현재 기록에는 연동 시스템이 지원하는 조치가 없어 실제 처리 경로가 열리지 않습니다.'),
+        );
+        return root;
+      }
+
+      // 효과 확인은 succeeded 이면서 observation.effectApplied === true 일 때만 인정한다.
+      const effectConfirmed = status === 'succeeded' && observation?.effectApplied === true && str(observation.observedAt) !== null;
+      const shown = status === 'succeeded' && !effectConfirmed ? 'unknown' : status;
+      root.dataset.studentActionState = shown;
+
+      const warn = shown !== 'prepared';
+      switch (shown) {
+        case 'loading':
+          root.append(text('p', '조치 준비 또는 결과 조회 중(loading): 결과가 아직 없습니다.'));
+          break;
+        case 'prepared':
+          root.append(text('p', '준비됨·미실행(prepared): 사람 확인 전이며 서버에 전달되지 않았습니다.'));
+          break;
+        case 'executing':
+          root.append(text('p', '서버에 전달 중(executing): 결과가 아직 확인되지 않았습니다.', 'identity-warn'));
+          break;
+        case 'pending':
+          root.append(
+            text('p', '서버 접수·처리 중(pending): 결과가 아직 확인되지 않았습니다.', 'identity-warn'),
+            text('p', '서버가 요청을 받았다는 응답(ACK)은 효과 확인이 아닙니다.'),
+          );
+          break;
+        case 'succeeded':
+          root.append(text('p', '효과 확인(succeeded): 연동 시스템이 효과를 관측했습니다.'));
+          break;
+        case 'denied':
+          root.append(text('p', '거절(denied): 연동 시스템이 조치를 거절했습니다.', 'identity-warn'));
+          break;
+        case 'failed':
+          root.append(text('p', '실패(failed): 연동 시스템이 조치를 처리하지 못했습니다.', 'identity-warn'));
+          break;
+        case 'expired':
+          root.append(text('p', '확인 기한 지남(expired): 이번 준비로는 집행할 수 없습니다. 조치를 다시 준비하세요.', 'identity-warn'));
+          break;
+        case 'error':
+          root.append(
+            text('p', '요청 처리 안 됨(error): 조치가 처리되지 않았습니다.', 'identity-warn'),
+            row('오류 코드', str(error?.code) ?? '확인 불가', true),
+            row('오류 메시지', str(error?.message) ?? '확인 불가', true),
+          );
+          break;
+        default:
+          root.append(
+            text('p', '결과 불명(unknown): 효과가 있었다고도 없었다고도 판단하지 마세요.', 'identity-warn'),
+            text('p', status === 'succeeded'
+              ? 'succeeded 응답이지만 효과 관측(effectApplied: true)이 없어 효과 확인으로 보지 않습니다.'
+              : '제공 화면의 「연동 시스템 결과만 재조회」 버튼으로 결과만 다시 조회하세요. 같은 조치를 다시 전달하지 마세요.'),
+          );
+      }
+      if (str(message) && shown !== 'error') root.append(row('안내', message, warn));
+
+      if (eventId) root.dataset.studentActionEvent = eventId;
+      if (requestId) root.dataset.studentActionRequest = requestId;
+
+      if (eventId) root.append(row('사건 ID', eventId));
+      const evidence = Array.isArray(event?.evidence) ? event.evidence.map((e) => str(e?.id)).filter(Boolean) : [];
+      if (evidence.length > 0) root.append(row('근거 ID', evidence.join(', ')));
+      if (str(actionId)) root.append(row('조치', actionId));
+      if (str(target?.id)) root.append(row('실제 대상', target.id));
+      if (Number.isInteger(target?.generation)) root.append(row('대상 세대(generation)', String(target.generation)));
+      if (shown === 'prepared' && str(confirmationExpiresAt)) root.append(row('확인 기한', confirmationExpiresAt));
+      if (requestId) root.append(row('requestId', requestId));
+      if (str(receipt?.receiptId)) root.append(row('receiptId', receipt.receiptId));
+      if (Number.isInteger(receipt?.version)) root.append(row('version', String(receipt.version)));
+      if (effectConfirmed) {
+        root.append(row('관측 시각', observation.observedAt), row('effectApplied', 'true'));
+      }
+      root.append(text('p', '조치 실행은 제공 화면의 버튼으로만 합니다. 이 영역은 상태만 보여 주며 어떤 요청도 보내지 않습니다.'));
+      return root;
+    },
   };
 }
