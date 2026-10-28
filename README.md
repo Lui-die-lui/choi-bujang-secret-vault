@@ -136,6 +136,38 @@ npm run bundle            # 제출 묶음 artifacts/submission.json (직접 점�
 
 수동 항목과 서버 기록 대조 절차는 [docs/OPS_VERIFY.md](docs/OPS_VERIFY.md)에 있습니다.
 
+## 마무리: 케셰브 「내 PC 상태」 대시보드 (로컬 실행, `on-client`)
+
+13~22단계로 만든 케셰브 앱(`on-client/`, 시작 틀 0.2.11)의 「보호 현황」 화면 안 **학생 상태·알림 표시** 카드(`renderStatus`) 맨 위에 PC 상태 패널을 추가했습니다. 위의 메모 서비스(Vercel, 12단계)와는 별개의 로컬 앱입니다.
+
+| 구분 | 내용 |
+|---|---|
+| 제공 기능 | 앱 서버·화면 틀(`src/server.mjs`, `public/app.js`), 학생 함수 8칸, `/api/diagnostics` 등. **제공된 「내 PC 상태」와 `student/appearance.json` 지원은 이 0.2.11 폴더에서 찾지 못했습니다.** |
+| 기존 학생 구현 | 13~20단계 `renderIdentity`~`renderVulnerabilities` (`student/extension.mjs`). 그대로 보존 |
+| 이번에 추가 | ① CPU·메모리·디스크 요약 ② 직전 조회와의 숫자 비교·설명 ③ 네트워크·방화벽·최근 24시간 Windows System/Application 경고·오류 건수. 파일: `student/pc-status.mjs`, `student/pc-probe.ps1`, `student/extension.mjs`(패널 추가), 제공 파일 최소 수정 2곳(`src/server.mjs`에 `GET /api/pc-status` 1개, `public/app.js` 허용 경로 1줄) |
+
+### 실행 (PowerShell, 실행 정책을 바꾸지 않음)
+
+```powershell
+cd "<이 저장소를 받은 폴더>\on-client"
+# start-alekov.ps1 처럼 비밀로 보이는 환경변수를 이 창에서만 지운 뒤 서버를 켭니다(값은 출력하지 않음).
+Get-ChildItem Env: | Where-Object { $_.Name -match '(?i)(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE_?KEY|ACCESS_?KEY|^ON_AI_|^OPENAI|^ANTHROPIC|^SUPABASE)' } | ForEach-Object { Remove-Item "Env:$($_.Name)" }
+node src/server.mjs
+```
+
+브라우저에서 `http://127.0.0.1:5189/` → 「보호 현황」 → 아래쪽 **학생 상태·알림 표시** 카드. 끄기는 `Ctrl+C`. 문법 점검은 `npm.cmd run check`(`npm.ps1`이 정책에 막히면 `.cmd` 사용).
+
+### 표시 규칙과 한계
+
+- 모든 값은 이 PC에서 읽은 값입니다. 예시값·기본값은 없고, 읽지 못한 항목은 0이 아니라 「확인 불가 + 이유 + 다음 행동」으로 표시합니다. 측정값마다 측정 시각(브라우저 시간대 표기)과 단위가 붙습니다.
+- CPU는 조회 중 1초 구간의 전체 논리 코어 평균 순간값, 메모리는 전체−운영체제 보고 사용 가능량, 디스크는 시스템 드라이브 한 곳(보통 `C:`)입니다.
+- 네트워크·방화벽·Windows 기록은 고정된 읽기 전용 스크립트(`student/pc-probe.ps1`)를 **실행 정책을 바꾸거나 우회하지 않고** 실행합니다. 정책이 스크립트를 막으면 「PowerShell 실행 정책이 조회 스크립트를 막았습니다」로 표시하고 다른 방식으로 바꿔 실행하지 않습니다. **이 PC는 실행 정책이 모두 미설정(`Undefined`)이라 이 세 항목이 막혔고, 그 상태로 확인했습니다.**
+- Windows 경고·오류 건수는 **침해나 공격 탐지 결과가 아닙니다.** IP·MAC·SSID·계정명·로그 원문은 조회·응답·저장하지 않습니다.
+- 추이는 CPU·메모리·디스크 숫자와 측정 시각만 브라우저 `localStorage`에 최대 100회 저장하며 「기록 삭제」로 지울 수 있습니다. 그래프는 만들지 않았습니다.
+- PC 조회 상태와 SDP 연결 상태는 따로 표시합니다. PC 조회 성공이 SDP 연결을 뜻하지 않습니다.
+- 화면은 패널 안쪽 사이드바(개요 / PC 상태 / 변화 비교 / PC 점검)와 시스템·라이트·다크 테마(직접 고르면 `localStorage`에 저장)로 구성했습니다. 앱 전체 화면이 아니라 이 카드 안에서만 적용됩니다. 디자인 확인 범위와 미검증 항목은 `docs/RELEASE_RECORD.md` 9-6을 봅니다.
+- 설치형 앱·`npm run package-app`·업데이트 도구에서의 동작은 **검증하지 않았습니다.** 과제 안내의 0.2.21 업데이트가 이 기능을 제공하는지도 **미확인**입니다(공식 업데이트 여부 미확인).
+
 ## 이전 단계 기록
 
 1~11단계 제작 기록(11단계 접속 앱·기기 승인 상세 포함, 8단계 구역 규칙, 9단계 탐지 규칙, 10단계 정책·메모 복원과 실제 실행 결과 포함)과 보너스 xdr-01·xdr-02의 자세한 내용은 [docs/STAGE_NOTES.md](docs/STAGE_NOTES.md)에 있습니다. 요약은 위 "지금 작동하는 기능"에 있습니다.

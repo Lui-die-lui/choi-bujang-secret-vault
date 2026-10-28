@@ -32,7 +32,7 @@ const STATE_NAMES = { access: '접속', session: '세션', device: '기기' };
 
 const KIND_LABELS ={ access: '접속 기록', xdr: 'XDR 사건' };
 
-const STUDENT_GET_PATHS = ['/api/me', '/api/apps', '/api/events', '/api/devices', '/api/sessions', '/api/vulnerabilities'];
+const STUDENT_GET_PATHS = ['/api/me', '/api/apps', '/api/events', '/api/devices', '/api/sessions', '/api/vulnerabilities', '/api/pc-status'];
 
 const RESOURCE_LABELS = {
   me: '로그인 정보',

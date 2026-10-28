@@ -14,6 +14,7 @@ import {createSdpHostEngine,isOwnedSdpHostEngine,openSdpIncidentOperation,readSd
 import {createOnAiService,validateLearnerSupportGuide} from './ai/service.mjs';
 import {prepareLearnerSupportRequest} from './ai/learner-support-contract.mjs';
 import {createVaultOnAiService} from './ai/vault-service.mjs';
+import {createPcStatusReader} from '../student/pc-status.mjs';
 import {createConnectionManager} from './connection/manager.mjs';
 import {createProjectScanner} from './vulnerabilities/project-scan.mjs';
 import {buildLocalLearnerSupportGuide,isLearnerSupportProblemKind,readLocalLearnerSupportObservation} from './learner-support/service.mjs';
@@ -194,6 +195,7 @@ async function jsonBody(req,keys,validate=(key,value)=>id(value)) {
   if(!record(body)||Object.keys(body).length!==keys.length||keys.some(key=>!Object.hasOwn(body,key)||!validate(key,body[key])))throw engineError('REQUEST_INVALID','요청에 필요한 항목만 보내세요.',400);
   return body;
 }
+const defaultPcStatusReader=createPcStatusReader();
 export function createOnServer(serverOptions={}) {
   if(!serverOptions||typeof serverOptions!=='object'||types.isProxy(serverOptions))throw Error('INVALID_SERVER_AI_CONFIGURATION');
   const sdpDescriptor=Object.getOwnPropertyDescriptor(serverOptions,'sdpHostEngine');let sdpHostEngine=null;
@@ -206,7 +208,7 @@ export function createOnServer(serverOptions={}) {
     nativeConfiguration=captureNativeHostConfiguration(nativeDescriptor.value);}
   else for(let p=Object.getPrototypeOf(serverOptions);p;p=Object.getPrototypeOf(p)){if(types.isProxy(p)||Object.getOwnPropertyDescriptor(p,'nativeHostConfiguration'))throw Error('INVALID_SERVER_AI_CONFIGURATION');}
   const {engine={evidenceMode:'disconnected'},actionConfiguration:givenActionConfiguration,sdpActionStartup,ai,resolveAiIdentity,readLearnerSupportIdentity,aiEnv=process.env,appCredentialVault,vaultAiConfiguration,aiConnectionConfiguration,allowLoopbackAiHttp=false,aiTimeoutMs=10000,
-    scanner=createProjectScanner(),assetsRoot=root,clock=()=>new Date(),readTimeoutMs=10000,requestTimeoutMs=15000}=serverOptions;
+    scanner=createProjectScanner(),assetsRoot=root,clock=()=>new Date(),readTimeoutMs=10000,requestTimeoutMs=15000,pcStatusReader=defaultPcStatusReader}=serverOptions;
   if(nativeConfiguration&&(ai!==undefined||resolveAiIdentity!==undefined||readLearnerSupportIdentity!==undefined||appCredentialVault!==undefined||vaultAiConfiguration!==undefined||aiConnectionConfiguration!==undefined||typeof aiEnv.ON_AI_APP_KEY==='string'&&aiEnv.ON_AI_APP_KEY))throw Error('INVALID_SERVER_AI_CONFIGURATION');
   const nativeHost=nativeConfiguration?createNativeHostContext(nativeConfiguration):null;
   // c2(#978): host 가 sdpActionStartup({databasePath, policy})을 주면, 이 서버가 만든 SDP host engine 과 genuine native host 를
@@ -690,6 +692,10 @@ export function createOnServer(serverOptions={}) {
       if(req.method==='GET'&&url.pathname==='/api/vulnerabilities'){
         const data=await bounded(signal=>scanner.scan({signal}));send(200,{ok:true,data});
         return;
+      }
+      // 학생 PC 상태 조회(student/pc-status.mjs). 고정된 읽기 전용 조회만 하며 요청의 값은 쓰지 않는다. SDP 연결 상태와 무관하다.
+      if(req.method==='GET'&&url.pathname==='/api/pc-status'){
+        const data=await bounded(()=>pcStatusReader.read());send(200,{ok:true,data});return;
       }
       send(404,{ok:false,error:{code:'NOT_FOUND',message:'지원하지 않는 주소입니다.',retryable:false}});
     }catch(error){

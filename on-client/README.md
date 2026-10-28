@@ -25,3 +25,7 @@ npm start도 같은 서버를 켭니다. 기본 실행은 실제 회사 시스�
 - 오류 코드별 해결: docs/CONNECTION_TROUBLESHOOT.md
 - 시작 틀 업데이트(내 파일 보존): docs/STARTER_UPDATE.md
 - 실제 회사 시스템(SDP)·앱 안 AI 연결은 담당자가 따로 안내할 때만 씁니다: docs/SDP_HOST_CONNECTION.md, docs/AI_SETUP_GUIDE.md. 이 연결은 앱을 처음 켜고 13~16단계 화면을 만들거나 공식 AI 코드 판정을 받기 위한 전제 조건은 아닙니다. 다만 17단계 이후의 실제 연결과 새 환경 재현은 해당 단계의 기준에 따라 따로 확인합니다.
+
+## 로컬 실행에 추가된 「내 PC 상태」 패널 (학생 추가, 시작 틀 제공 기능 아님)
+
+「보호 현황」의 학생 상태·알림 표시 카드(`renderStatus`) 맨 위에 CPU·메모리·디스크, 직전 조회와의 비교, 네트워크·방화벽·최근 24시간 Windows 경고·오류 건수가 나옵니다. 조회 코드는 `student/pc-status.mjs`와 고정 스크립트 `student/pc-probe.ps1`이고, 서버에는 `GET /api/pc-status` 하나만 더했습니다. 자세한 실행 방법과 한계는 프로젝트 루트 `README.md`의 「마무리」와 `docs/RELEASE_RECORD.md` 9장을 봅니다. PowerShell 실행 정책이 스크립트를 막으면 해당 항목은 「확인 불가」로 표시하며, 앱은 정책을 바꾸거나 우회하지 않습니다. 시작 틀을 업데이트할 때 `src/server.mjs`·`public/app.js`는 수정된 제공 파일로 보존될 수 있습니다.
