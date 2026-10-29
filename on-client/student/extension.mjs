@@ -1013,7 +1013,7 @@ export function createStudentView({ api, onChange } = {}) {
           for (const device of data) box.append(deviceRow(device));
         }),
         statusSection('로그인 세션', '로그인 세션', sessions, (box, data) => {
-          box.append(text('p', '지금 검증된 연결 한 개만 표시합니다. 지난 세션 목록이 아닙니다.', 'identity-mode'));
+          box.append(text('p', '서버가 돌려준 로그인 세션을 그대로 표시합니다. 이 화면이 지난 세션 기록 여부까지 확인한 것은 아닙니다.', 'identity-mode'));
           if (!Array.isArray(data) || data.length === 0) return box.append(text('p', '현재 연결 없음'));
           for (const session of data) box.append(sessionRow(session));
         }),
@@ -1302,7 +1302,7 @@ export function createStudentView({ api, onChange } = {}) {
       if (status === 'idle') {
         root.append(
           text('p', '아직 미실행(idle): 조치 제안·확인·전달이 없었습니다.'),
-          text('p', '조치 준비 버튼이 보이지 않는 것은 정상입니다. 현재 기록에는 연동 시스템이 지원하는 조치가 없어 실제 처리 경로가 열리지 않습니다.'),
+          text('p', '아직 조치 준비·전달이 없습니다. 이 화면은 지원되는 조치가 있는지까지는 판단하지 않습니다.'),
         );
         return root;
       }
